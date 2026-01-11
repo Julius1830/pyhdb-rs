@@ -10,7 +10,9 @@ use crate::connection::{ConnectionInner, SharedConnection};
 use crate::cursor::state::ColumnDescription;
 use crate::error::PyHdbError;
 use crate::reader::PyRecordBatchReader;
-use crate::types::hana_value_to_python;
+use crate::types::{
+    get_date_cls, get_datetime_cls, get_decimal_cls, get_time_cls, hana_value_to_python,
+};
 
 /// Internal cursor state.
 #[derive(Debug)]
@@ -250,14 +252,20 @@ impl PyCursor {
 
     /// Get results as Arrow `RecordBatchReader`.
     #[pyo3(signature = (batch_size=65536))]
-    fn fetch_arrow(&self, batch_size: usize) -> PyResult<PyRecordBatchReader> {
-        let mut guard = self.inner.lock();
-        match std::mem::replace(&mut *guard, CursorInner::Idle) {
-            CursorInner::Active { result_set, .. } => {
-                PyRecordBatchReader::from_resultset(result_set, batch_size)
+    fn fetch_arrow(&self, py: Python<'_>, batch_size: usize) -> PyResult<PyRecordBatchReader> {
+        // Extract result_set while holding lock briefly
+        let result_set = {
+            let mut guard = self.inner.lock();
+            match std::mem::replace(&mut *guard, CursorInner::Idle) {
+                CursorInner::Active { result_set, .. } => result_set,
+                CursorInner::Idle => {
+                    return Err(PyHdbError::programming("no active result set").into());
+                }
             }
-            CursorInner::Idle => Err(PyHdbError::programming("no active result set").into()),
-        }
+        };
+
+        // Release GIL for CPU-bound schema building and processor creation
+        py.detach(|| PyRecordBatchReader::from_resultset(result_set, batch_size))
     }
 
     // Iterator protocol
@@ -321,6 +329,8 @@ enum SerializableValue {
 }
 
 /// Convert Python parameters (tuple/list) to serializable values.
+// PySequence::downcast is deprecated in PyO3 0.23+ (use extract::<PySequence>() instead).
+// Keeping downcast for now as it still works and the migration is non-trivial.
 #[allow(deprecated)]
 fn convert_to_serializable(params: &Bound<'_, PyAny>) -> PyResult<Vec<SerializableValue>> {
     let sequence: &Bound<'_, PySequence> = params.downcast()?;
@@ -337,6 +347,7 @@ fn convert_to_serializable(params: &Bound<'_, PyAny>) -> PyResult<Vec<Serializab
 }
 
 /// Convert sequence of Python parameter tuples/lists to batch serializable values.
+// See convert_to_serializable for deprecation note.
 #[allow(deprecated)]
 fn convert_to_serializable_batch(seq: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<SerializableValue>>> {
     let sequence: &Bound<'_, PySequence> = seq.downcast()?;
@@ -360,10 +371,9 @@ fn python_to_serializable(obj: &Bound<'_, PyAny>) -> PyResult<SerializableValue>
 
     // Check for datetime types first (before generic checks)
     let py = obj.py();
-    let datetime_mod = py.import("datetime")?;
 
     // Check if it's a datetime.datetime (must check before date since datetime is a subclass)
-    let datetime_cls = datetime_mod.getattr("datetime")?;
+    let datetime_cls = get_datetime_cls(py)?;
     if obj.is_instance(&datetime_cls)? {
         let year: i32 = obj.getattr("year")?.extract()?;
         let month: u32 = obj.getattr("month")?.extract()?;
@@ -384,7 +394,7 @@ fn python_to_serializable(obj: &Bound<'_, PyAny>) -> PyResult<SerializableValue>
     }
 
     // Check if it's a datetime.date
-    let date_cls = datetime_mod.getattr("date")?;
+    let date_cls = get_date_cls(py)?;
     if obj.is_instance(&date_cls)? {
         let year: i32 = obj.getattr("year")?.extract()?;
         let month: u32 = obj.getattr("month")?.extract()?;
@@ -394,7 +404,7 @@ fn python_to_serializable(obj: &Bound<'_, PyAny>) -> PyResult<SerializableValue>
     }
 
     // Check if it's a datetime.time
-    let time_cls = datetime_mod.getattr("time")?;
+    let time_cls = get_time_cls(py)?;
     if obj.is_instance(&time_cls)? {
         let hour: u32 = obj.getattr("hour")?.extract()?;
         let minute: u32 = obj.getattr("minute")?.extract()?;
@@ -404,8 +414,7 @@ fn python_to_serializable(obj: &Bound<'_, PyAny>) -> PyResult<SerializableValue>
     }
 
     // Check for Python Decimal
-    let decimal_mod = py.import("decimal")?;
-    let decimal_cls = decimal_mod.getattr("Decimal")?;
+    let decimal_cls = get_decimal_cls(py)?;
     if obj.is_instance(&decimal_cls)? {
         let s: String = obj.str()?.extract()?;
         return Ok(SerializableValue::String(s));

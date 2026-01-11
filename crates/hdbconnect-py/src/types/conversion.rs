@@ -3,12 +3,16 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyFloat, PyInt, PyString};
 
+use super::cache::{get_date_cls, get_datetime_cls, get_decimal_cls, get_time_cls};
 use crate::error::PyHdbError;
 
 /// Parse ISO timestamp string to Python datetime.
+///
+/// Parses HANA timestamp format "YYYY-MM-DDTHH:MM:SS[.FFFFFFF]" to Python datetime.
+/// On parse failures, returns the original string rather than failing, since this
+/// is display/conversion code where partial results are acceptable.
 fn parse_timestamp_to_python<'py>(py: Python<'py>, s: &str) -> PyResult<Bound<'py, PyAny>> {
-    let datetime_mod = py.import("datetime")?;
-    let datetime_cls = datetime_mod.getattr("datetime")?;
+    let datetime_cls = get_datetime_cls(py)?;
 
     // Display format: "YYYY-MM-DDTHH:MM:SS[.FFFFFFF]"
     let parts: Vec<&str> = s.split('T').collect();
@@ -27,6 +31,9 @@ fn parse_timestamp_to_python<'py>(py: Python<'py>, s: &str) -> PyResult<Bound<'p
         let time_parts: Vec<&str> = time_part.split(':').collect();
 
         if date_parts.len() == 3 && time_parts.len() == 3 {
+            // Fallback to epoch/zero values on parse failure - this is intentional
+            // rather than failing the entire conversion. Invalid dates will produce
+            // unusual but valid datetime objects (e.g., 1970-01-01 00:00:00).
             let year: i32 = date_parts[0].parse().unwrap_or(1970);
             let month: u32 = date_parts[1].parse().unwrap_or(1);
             let day: u32 = date_parts[2].parse().unwrap_or(1);
@@ -36,7 +43,7 @@ fn parse_timestamp_to_python<'py>(py: Python<'py>, s: &str) -> PyResult<Bound<'p
             return datetime_cls.call1((year, month, day, hour, minute, second, microseconds));
         }
     }
-    // Fallback to string representation
+    // Fallback to string representation for unparseable formats
     Ok(s.into_pyobject(py)?.clone().into_any())
 }
 
@@ -60,41 +67,41 @@ pub fn hana_value_to_python<'py>(
         HdbValue::BINARY(b) => Ok(PyBytes::new(py, b).clone().into_any()),
         // Decimal: convert to Python Decimal
         HdbValue::DECIMAL(d) => {
-            let decimal_mod = py.import("decimal")?;
-            let decimal_cls = decimal_mod.getattr("Decimal")?;
+            let decimal_cls = get_decimal_cls(py)?;
             let s = d.to_string();
             decimal_cls.call1((s,))
         }
         // Date: convert to Python datetime.date
         HdbValue::DAYDATE(d) => {
-            let datetime_mod = py.import("datetime")?;
-            let date_cls = datetime_mod.getattr("date")?;
+            let date_cls = get_date_cls(py)?;
             // DayDate displays as "YYYY-MM-DD"
             let s = d.to_string();
             let parts: Vec<&str> = s.split('-').collect();
             if parts.len() == 3 {
+                // Fallback to epoch date on parse failure (see parse_timestamp_to_python)
                 let year: i32 = parts[0].parse().unwrap_or(1970);
                 let month: u32 = parts[1].parse().unwrap_or(1);
                 let day: u32 = parts[2].parse().unwrap_or(1);
                 date_cls.call1((year, month, day))
             } else {
-                // Fallback to string
+                // Fallback to string for non-standard formats
                 Ok(s.into_pyobject(py)?.clone().into_any())
             }
         }
         // Time: convert to Python datetime.time
         HdbValue::SECONDTIME(t) => {
-            let datetime_mod = py.import("datetime")?;
-            let time_cls = datetime_mod.getattr("time")?;
+            let time_cls = get_time_cls(py)?;
             // SecondTime displays as "HH:MM:SS"
             let s = t.to_string();
             let parts: Vec<&str> = s.split(':').collect();
             if parts.len() == 3 {
+                // Fallback to midnight on parse failure (see parse_timestamp_to_python)
                 let hour: u32 = parts[0].parse().unwrap_or(0);
                 let minute: u32 = parts[1].parse().unwrap_or(0);
                 let second: u32 = parts[2].parse().unwrap_or(0);
                 time_cls.call1((hour, minute, second))
             } else {
+                // Fallback to string for non-standard formats
                 Ok(s.into_pyobject(py)?.clone().into_any())
             }
         }
@@ -123,10 +130,9 @@ pub fn python_to_hana_value(obj: &Bound<'_, PyAny>) -> PyResult<hdbconnect::HdbV
 
     // Check for datetime types first (before generic checks)
     let py = obj.py();
-    let datetime_mod = py.import("datetime")?;
 
     // Check if it's a datetime.datetime (must check before date since datetime is a subclass)
-    let datetime_cls = datetime_mod.getattr("datetime")?;
+    let datetime_cls = get_datetime_cls(py)?;
     if obj.is_instance(&datetime_cls)? {
         // Extract datetime components and format as ISO string for HANA
         let year: i32 = obj.getattr("year")?.extract()?;
@@ -149,7 +155,7 @@ pub fn python_to_hana_value(obj: &Bound<'_, PyAny>) -> PyResult<hdbconnect::HdbV
     }
 
     // Check if it's a datetime.date
-    let date_cls = datetime_mod.getattr("date")?;
+    let date_cls = get_date_cls(py)?;
     if obj.is_instance(&date_cls)? {
         let year: i32 = obj.getattr("year")?.extract()?;
         let month: u32 = obj.getattr("month")?.extract()?;
@@ -159,7 +165,7 @@ pub fn python_to_hana_value(obj: &Bound<'_, PyAny>) -> PyResult<hdbconnect::HdbV
     }
 
     // Check if it's a datetime.time
-    let time_cls = datetime_mod.getattr("time")?;
+    let time_cls = get_time_cls(py)?;
     if obj.is_instance(&time_cls)? {
         let hour: u32 = obj.getattr("hour")?.extract()?;
         let minute: u32 = obj.getattr("minute")?.extract()?;
@@ -169,8 +175,7 @@ pub fn python_to_hana_value(obj: &Bound<'_, PyAny>) -> PyResult<hdbconnect::HdbV
     }
 
     // Check for Python Decimal
-    let decimal_mod = py.import("decimal")?;
-    let decimal_cls = decimal_mod.getattr("Decimal")?;
+    let decimal_cls = get_decimal_cls(py)?;
     if obj.is_instance(&decimal_cls)? {
         let s: String = obj.str()?.extract()?;
         return Ok(HdbValue::STRING(s));
@@ -229,17 +234,16 @@ pub fn hana_value_to_python_async<'py>(
         HdbValue::STRING(s) => Ok(s.into_pyobject(py)?.clone().into_any()),
         HdbValue::BINARY(b) => Ok(PyBytes::new(py, b).clone().into_any()),
         HdbValue::DECIMAL(d) => {
-            let decimal_mod = py.import("decimal")?;
-            let decimal_cls = decimal_mod.getattr("Decimal")?;
+            let decimal_cls = get_decimal_cls(py)?;
             let s = d.to_string();
             decimal_cls.call1((s,))
         }
         HdbValue::DAYDATE(d) => {
-            let datetime_mod = py.import("datetime")?;
-            let date_cls = datetime_mod.getattr("date")?;
+            let date_cls = get_date_cls(py)?;
             let s = d.to_string();
             let parts: Vec<&str> = s.split('-').collect();
             if parts.len() == 3 {
+                // Fallback to epoch date on parse failure (see parse_timestamp_to_python)
                 let year: i32 = parts[0].parse().unwrap_or(1970);
                 let month: u32 = parts[1].parse().unwrap_or(1);
                 let day: u32 = parts[2].parse().unwrap_or(1);
@@ -249,11 +253,11 @@ pub fn hana_value_to_python_async<'py>(
             }
         }
         HdbValue::SECONDTIME(t) => {
-            let datetime_mod = py.import("datetime")?;
-            let time_cls = datetime_mod.getattr("time")?;
+            let time_cls = get_time_cls(py)?;
             let s = t.to_string();
             let parts: Vec<&str> = s.split(':').collect();
             if parts.len() == 3 {
+                // Fallback to midnight on parse failure (see parse_timestamp_to_python)
                 let hour: u32 = parts[0].parse().unwrap_or(0);
                 let minute: u32 = parts[1].parse().unwrap_or(0);
                 let second: u32 = parts[2].parse().unwrap_or(0);

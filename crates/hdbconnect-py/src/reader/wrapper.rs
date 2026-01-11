@@ -33,13 +33,31 @@ struct StreamingReader {
     exhausted: bool,
 }
 
-// SAFETY: StreamingReader is only used within a single Python thread context.
-// The hdbconnect::ResultSet is not shared across threads; it is created and
-// consumed within the same connection context. The Send impl is required by
-// pyo3_arrow::PyRecordBatchReader but we ensure thread isolation through:
-// 1. Python GIL protection on the PyRecordBatchReader wrapper
-// 2. Mutex<ConnectionInner> guards all connection state in parent
-// 3. ResultSet iteration is single-threaded by design (no concurrent access)
+// SAFETY: StreamingReader requires `Send` for pyo3_arrow::PyRecordBatchReader.
+//
+// hdbconnect::ResultSet is !Send because it may contain non-thread-safe internals
+// (e.g., TCP stream state, internal buffers). However, we guarantee thread safety
+// through the following invariants:
+//
+// INVARIANTS:
+// 1. Single-owner semantics: StreamingReader takes ownership of ResultSet via std::mem::replace in
+//    fetch_arrow(), transferring it out of the Mutex-protected CursorInner. Only one
+//    StreamingReader can own a ResultSet at a time.
+//
+// 2. GIL synchronization: pyo3_arrow::PyRecordBatchReader exposes the iterator through Python's
+//    Arrow C Stream interface. All access from Python code requires holding the GIL, which
+//    serializes access.
+//
+// 3. No concurrent iteration: The Arrow C Stream protocol is inherently sequential - get_next() is
+//    called one batch at a time. The RecordBatchReader trait's Iterator impl is not accessed from
+//    multiple threads simultaneously.
+//
+// 4. Lifetime bound to Python object: The PyRecordBatchReader Python object prevents the underlying
+//    reader from being accessed after the object is dropped.
+//
+// VERIFICATION: If pyo3_arrow ever changes to access iterators without GIL held,
+// this impl would become unsound. Review pyo3_arrow updates for changes to
+// thread-safety guarantees.
 unsafe impl Send for StreamingReader {}
 
 impl StreamingReader {
