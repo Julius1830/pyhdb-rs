@@ -92,7 +92,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install maturin pytest pytest-cov polars pandas pyarrow
       - name: Build wheel
-        run: maturin develop --manifest-path crates/hdbconnect-py/Cargo.toml -E dev
+        run: maturin develop --manifest-path ../crates/hdbconnect-py/Cargo.toml
         working-directory: python
       - name: Run tests with coverage
         run: pytest tests/python/ -v --tb=short --cov=pyhdb_rs --cov-report=xml
