@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "pyhdb_rs"
 version = "0.1.0"
 description = "High-performance Python driver for SAP HANA with native Arrow support"
-readme = "../README.md"
+readme = "README.md"
 license = { text = "Apache-2.0 OR MIT" }
 authors = [{ name = "Andrei G", email = "andrei.g@my.com" }]
 requires-python = ">=3.11"
