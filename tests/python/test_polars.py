@@ -86,7 +86,7 @@ class TestWriteHana:
         return f"TEST_POLARS_{uuid.uuid4().hex[:8].upper()}"
 
     def test_write_hana_replace(
-        self, hana_uri: str, test_table_name: str, connection: object  # noqa: ARG002
+        self, hana_uri: str, test_table_name: str, connection: object
     ) -> None:
         """Test write_hana with if_table_exists='replace'."""
         polars = pytest.importorskip("polars")
