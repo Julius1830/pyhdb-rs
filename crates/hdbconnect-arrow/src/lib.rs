@@ -13,22 +13,39 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use hdbconnect_arrow::{Result, BatchConfig};
+//! use hdbconnect_arrow::{Result, BatchConfig, HanaBatchProcessor};
 //!
 //! // Configure batch processing
 //! let config = BatchConfig::default();
-//! // ... use with HANA result set processing
+//! let schema = /* Arrow schema */;
+//! let mut processor = HanaBatchProcessor::new(schema, config);
+//!
+//! // Process rows
+//! for row in result_set {
+//!     if let Some(batch) = processor.process_row(&row)? {
+//!         // Handle batch
+//!     }
+//! }
+//!
+//! // Flush remaining rows
+//! if let Some(batch) = processor.flush()? {
+//!     // Handle final batch
+//! }
 //! ```
 #![warn(missing_docs)]
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]
 
+pub mod builders;
+pub mod conversion;
 pub mod error;
 pub mod schema;
 pub mod traits;
 pub mod types;
 
 // Re-export main types for convenience
+pub use builders::factory::BuilderFactory;
+pub use conversion::{rows_to_record_batch, HanaBatchProcessor};
 pub use error::{ArrowConversionError, Result};
 pub use schema::mapping::SchemaMapper;
 pub use traits::builder::HanaCompatibleBuilder;
