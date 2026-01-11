@@ -91,7 +91,7 @@ impl SchemaFromHana for Schema {
 
 #[cfg(test)]
 mod tests {
-    use std::mem::size_of_val;
+    use std::mem::{size_of, size_of_val};
 
     use super::*;
 
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_schema_mapper_is_zero_sized() {
-        assert_eq!(std::mem::size_of::<SchemaMapper>(), 0);
+        assert_eq!(size_of::<SchemaMapper>(), 0);
     }
 
     #[test]
