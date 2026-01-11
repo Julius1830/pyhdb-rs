@@ -103,11 +103,14 @@ impl Decimal128BuilderWrapper {
 
     /// Convert a HANA decimal value to i128 with proper scaling.
     ///
+    /// Uses direct `BigDecimal` arithmetic via `as_bigint_and_exponent()` to avoid
+    /// heap allocations from string parsing.
+    ///
     /// # Implementation Note
     ///
     /// HANA DECIMAL values are represented as `BigDecimal` in hdbconnect.
     /// We need to:
-    /// 1. Extract mantissa and exponent
+    /// 1. Extract mantissa and exponent using `as_bigint_and_exponent()`
     /// 2. Scale to match Arrow Decimal128 scale
     /// 3. Convert to i128
     ///
@@ -116,68 +119,54 @@ impl Decimal128BuilderWrapper {
     /// Returns error if value cannot be represented in Decimal128.
     fn convert_decimal(&self, value: &hdbconnect::HdbValue) -> Result<i128> {
         use hdbconnect::HdbValue;
+        use num_bigint::BigInt;
+        use num_traits::ToPrimitive;
 
         match value {
             HdbValue::DECIMAL(decimal) => {
-                // Convert to string, then parse as i128 with proper scaling
-                // This is a simplified approach - production code may need
-                // more sophisticated decimal arithmetic
+                let (mantissa, exponent) = decimal.as_bigint_and_exponent();
+                let target_scale = i64::from(self.config.scale());
 
-                let string_repr = decimal.to_string();
+                // BigDecimal::as_bigint_and_exponent() returns (mantissa, scale) where:
+                // - mantissa is the unscaled integer representation
+                // - scale is POSITIVE for fractional parts: 123.45 -> (12345, 2) meaning:
+                //   actual_value = mantissa / 10^scale
+                // We need to rescale to target_scale for Arrow Decimal128
+                let scale_diff = target_scale - exponent;
 
-                // Parse the decimal string
-                // Example: "123.45" with scale=2 -> 12345_i128
-                let parts: Vec<&str> = string_repr.split('.').collect();
-
-                let (int_part, frac_part) = match parts.len() {
-                    1 => (parts[0], ""),
-                    2 => (parts[0], parts[1]),
-                    _ => {
-                        return Err(crate::ArrowConversionError::value_conversion(
-                            "decimal",
-                            format!("invalid decimal format: {string_repr}"),
-                        ));
-                    }
-                };
-
-                // Build the scaled integer value
-                #[allow(clippy::cast_sign_loss)]
-                let target_scale = self.config.scale() as usize;
-                let frac_digits = frac_part.len();
-
-                let scaled_str = match frac_digits.cmp(&target_scale) {
-                    std::cmp::Ordering::Less => {
-                        // Pad with zeros
-                        format!(
-                            "{int_part}{frac_part}{}",
-                            "0".repeat(target_scale - frac_digits)
-                        )
-                    }
-                    std::cmp::Ordering::Greater => {
-                        // Truncate (or round - implementation choice)
-                        format!("{int_part}{}", &frac_part[..target_scale])
-                    }
-                    std::cmp::Ordering::Equal => {
-                        format!("{int_part}{frac_part}")
-                    }
-                };
-
-                scaled_str.parse::<i128>().map_err(|e| {
-                    crate::ArrowConversionError::value_conversion(
-                        "decimal",
-                        format!(
-                            "cannot convert {} to Decimal128({}, {}): {}",
-                            string_repr,
+                let scaled_value = if scale_diff >= 0 {
+                    // Need to multiply by 10^scale_diff
+                    // scale_diff is bounded by max precision (38) + exponent range, fits in u32
+                    let exp = u32::try_from(scale_diff).map_err(|_| {
+                        crate::ArrowConversionError::decimal_overflow(
                             self.config.precision(),
                             self.config.scale(),
-                            e
-                        ),
+                        )
+                    })?;
+                    let multiplier = BigInt::from(10_i128).pow(exp);
+                    &mantissa * &multiplier
+                } else {
+                    // Need to divide by 10^(-scale_diff) - may lose precision
+                    let exp = u32::try_from(-scale_diff).map_err(|_| {
+                        crate::ArrowConversionError::decimal_overflow(
+                            self.config.precision(),
+                            self.config.scale(),
+                        )
+                    })?;
+                    let divisor = BigInt::from(10_i128).pow(exp);
+                    &mantissa / &divisor
+                };
+
+                scaled_value.to_i128().ok_or_else(|| {
+                    crate::ArrowConversionError::decimal_overflow(
+                        self.config.precision(),
+                        self.config.scale(),
                     )
                 })
             }
             other => Err(crate::ArrowConversionError::value_conversion(
                 "decimal",
-                format!("expected DECIMAL, got {other:?}"),
+                format!("expected DECIMAL, got {:?}", std::mem::discriminant(other)),
             )),
         }
     }
@@ -438,5 +427,325 @@ mod tests {
         builder.reset();
         assert_eq!(builder.len(), 0);
         assert!(builder.is_empty());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // convert_decimal Tests (CRIT-001)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[cfg(feature = "test-utils")]
+    mod convert_decimal_tests {
+        use arrow_array::Decimal128Array;
+
+        use super::*;
+        use crate::traits::row::MockRowBuilder;
+
+        /// Helper to extract i128 value from builder after appending decimal
+        fn convert_and_get_value(precision: u8, scale: i8, decimal_str: &str) -> i128 {
+            let mut builder = Decimal128BuilderWrapper::new(10, precision, scale);
+            let row = MockRowBuilder::new().decimal_str(decimal_str).build();
+            builder.append_hana_value(&row[0]).unwrap();
+            let array = builder.finish();
+            let decimal_array = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
+            decimal_array.value(0)
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Basic decimal conversion tests
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_simple_value() {
+            // 123.45 with scale=2 should store as 12345
+            let value = convert_and_get_value(18, 2, "123.45");
+            assert_eq!(value, 12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_integer_value() {
+            // 100 with scale=0 should store as 100
+            let value = convert_and_get_value(10, 0, "100");
+            assert_eq!(value, 100);
+        }
+
+        #[test]
+        fn test_convert_decimal_large_value() {
+            // 9999999.99 with scale=2 should store as 999999999
+            let value = convert_and_get_value(18, 2, "9999999.99");
+            assert_eq!(value, 999999999);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Scale-up tests (target_scale > source_scale)
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_scale_up_integer_to_decimal() {
+            // 100 (scale=0) to scale=2 should become 10000 (100.00)
+            let value = convert_and_get_value(10, 2, "100");
+            assert_eq!(value, 10000);
+        }
+
+        #[test]
+        fn test_convert_decimal_scale_up_by_one() {
+            // 123.4 (scale=1) to scale=2 should become 12340 (123.40)
+            let value = convert_and_get_value(10, 2, "123.4");
+            assert_eq!(value, 12340);
+        }
+
+        #[test]
+        fn test_convert_decimal_scale_up_by_multiple() {
+            // 5 (scale=0) to scale=4 should become 50000 (5.0000)
+            let value = convert_and_get_value(10, 4, "5");
+            assert_eq!(value, 50000);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Scale-down tests (target_scale < source_scale, may lose precision)
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_scale_down_truncate() {
+            // 123.456 (scale=3) to scale=2 should become 12345 (123.45, truncated)
+            let value = convert_and_get_value(10, 2, "123.456");
+            assert_eq!(value, 12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_scale_down_to_integer() {
+            // 123.99 (scale=2) to scale=0 should become 123 (truncated)
+            let value = convert_and_get_value(10, 0, "123.99");
+            assert_eq!(value, 123);
+        }
+
+        #[test]
+        fn test_convert_decimal_scale_down_multiple_places() {
+            // 1.23456789 (scale=8) to scale=2 should become 123 (1.23)
+            let value = convert_and_get_value(18, 2, "1.23456789");
+            assert_eq!(value, 123);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Scale-match tests (target_scale == source_scale)
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_scale_match_exact() {
+            // 123.45 (scale=2) to scale=2 should be 12345 (no change)
+            let value = convert_and_get_value(18, 2, "123.45");
+            assert_eq!(value, 12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_scale_match_high_scale() {
+            // 1.234567890123456789 (scale=18) to scale=18
+            let value = convert_and_get_value(38, 18, "1.234567890123456789");
+            assert_eq!(value, 1_234_567_890_123_456_789_i128);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Negative value tests
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_negative_simple() {
+            // -123.45 with scale=2 should store as -12345
+            let value = convert_and_get_value(18, 2, "-123.45");
+            assert_eq!(value, -12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_negative_scale_up() {
+            // -100 (scale=0) to scale=2 should become -10000
+            let value = convert_and_get_value(10, 2, "-100");
+            assert_eq!(value, -10000);
+        }
+
+        #[test]
+        fn test_convert_decimal_negative_scale_down() {
+            // -123.456 (scale=3) to scale=2 should become -12345 (truncated toward zero)
+            let value = convert_and_get_value(10, 2, "-123.456");
+            assert_eq!(value, -12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_negative_large() {
+            // -9999999.99 with scale=2
+            let value = convert_and_get_value(18, 2, "-9999999.99");
+            assert_eq!(value, -999999999);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Zero value tests
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_zero() {
+            let value = convert_and_get_value(10, 2, "0");
+            assert_eq!(value, 0);
+        }
+
+        #[test]
+        fn test_convert_decimal_zero_with_scale() {
+            // 0.00 with scale=2 should store as 0
+            let value = convert_and_get_value(10, 2, "0.00");
+            assert_eq!(value, 0);
+        }
+
+        #[test]
+        fn test_convert_decimal_negative_zero() {
+            // -0 should still be 0
+            let value = convert_and_get_value(10, 2, "-0");
+            assert_eq!(value, 0);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Maximum precision (38-digit) tests
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_max_precision_integer() {
+            // Maximum 38-digit integer that fits in i128 (precision=38, scale=0)
+            // i128::MAX is 170141183460469231731687303715884105727 (39 digits)
+            // We use a 38-digit number
+            let value = convert_and_get_value(38, 0, "99999999999999999999999999999999999999");
+            assert_eq!(
+                value,
+                99_999_999_999_999_999_999_999_999_999_999_999_999_i128
+            );
+        }
+
+        #[test]
+        fn test_convert_decimal_max_precision_with_scale() {
+            // 38-digit decimal with scale: 9999999999999999999999999999999999.9999
+            // stored as 99999999999999999999999999999999999999 with scale=4
+            let value = convert_and_get_value(38, 4, "9999999999999999999999999999999999.9999");
+            assert_eq!(
+                value,
+                99_999_999_999_999_999_999_999_999_999_999_999_999_i128
+            );
+        }
+
+        #[test]
+        fn test_convert_decimal_i128_max_boundary() {
+            // Test value close to i128::MAX
+            // i128::MAX = 170141183460469231731687303715884105727
+            let value = convert_and_get_value(38, 0, "170141183460469231731687303715884105727");
+            assert_eq!(value, i128::MAX);
+        }
+
+        #[test]
+        fn test_convert_decimal_i128_min_boundary() {
+            // Test value close to i128::MIN
+            // i128::MIN = -170141183460469231731687303715884105728
+            let value = convert_and_get_value(38, 0, "-170141183460469231731687303715884105728");
+            assert_eq!(value, i128::MIN);
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Overflow detection tests
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_overflow_scale_up() {
+            // Scale up operation that causes overflow:
+            // i128::MAX with additional scaling would overflow
+            let mut builder = Decimal128BuilderWrapper::new(10, 38, 10);
+            // Create a value that when scaled up by 10^10, exceeds i128::MAX
+            let row = MockRowBuilder::new()
+                .decimal_str("17014118346046923173168730371588410573")
+                .build();
+            let result = builder.append_hana_value(&row[0]);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_convert_decimal_overflow_large_value() {
+            // Value already exceeding i128 range after scaling
+            let mut builder = Decimal128BuilderWrapper::new(10, 38, 0);
+            // This is larger than i128::MAX
+            let row = MockRowBuilder::new()
+                .decimal_str("999999999999999999999999999999999999999")
+                .build();
+            let result = builder.append_hana_value(&row[0]);
+            assert!(result.is_err());
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Wrong type error handling tests
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_wrong_type_int() {
+            let mut builder = Decimal128BuilderWrapper::new(10, 18, 2);
+            let row = MockRowBuilder::new().int(42).build();
+            let result = builder.append_hana_value(&row[0]);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_convert_decimal_wrong_type_string() {
+            let mut builder = Decimal128BuilderWrapper::new(10, 18, 2);
+            let row = MockRowBuilder::new().string("123.45").build();
+            let result = builder.append_hana_value(&row[0]);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_convert_decimal_wrong_type_null() {
+            let mut builder = Decimal128BuilderWrapper::new(10, 18, 2);
+            let row = MockRowBuilder::new().null().build();
+            let result = builder.append_hana_value(&row[0]);
+            // NULL should be handled via append_null, not convert_decimal
+            // append_hana_value with NULL should fail
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_convert_decimal_wrong_type_double() {
+            let mut builder = Decimal128BuilderWrapper::new(10, 18, 2);
+            let row = MockRowBuilder::new().double(123.45).build();
+            let result = builder.append_hana_value(&row[0]);
+            assert!(result.is_err());
+        }
+
+        // ───────────────────────────────────────────────────────────────────────
+        // Additional edge cases
+        // ───────────────────────────────────────────────────────────────────────
+
+        #[test]
+        fn test_convert_decimal_very_small_value() {
+            // 0.00000001 with scale=8 should be 1
+            let value = convert_and_get_value(18, 8, "0.00000001");
+            assert_eq!(value, 1);
+        }
+
+        #[test]
+        fn test_convert_decimal_leading_zeros() {
+            // 00123.45 should be same as 123.45
+            let value = convert_and_get_value(18, 2, "00123.45");
+            assert_eq!(value, 12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_trailing_zeros() {
+            // 123.450 should be same as 123.45 when target scale is 2
+            let value = convert_and_get_value(18, 2, "123.450");
+            assert_eq!(value, 12345);
+        }
+
+        #[test]
+        fn test_convert_decimal_scientific_notation() {
+            // 1.23e2 = 123 with scale=0
+            let value = convert_and_get_value(10, 0, "1.23e2");
+            assert_eq!(value, 123);
+        }
+
+        #[test]
+        fn test_convert_decimal_scientific_notation_negative_exp() {
+            // 12300e-2 = 123 with scale=0
+            let value = convert_and_get_value(10, 0, "12300e-2");
+            assert_eq!(value, 123);
+        }
     }
 }

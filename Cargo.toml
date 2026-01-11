@@ -33,17 +33,19 @@ multiple_crate_versions = "allow"
 # Dependencies sorted ALPHABETICALLY - versions only (features in crates)
 [workspace.dependencies]
 arrow = { version = "57.0", default-features = false }
-bigdecimal = "0.4"
 arrow-array = "57.0"
 arrow-buffer = "57.0"
 arrow-data = "57.0"
 arrow-schema = "57.1"
+bigdecimal = "0.4"
 criterion = "0.8"
 deadpool = { version = "0.12", default-features = false }
 hdbconnect = "0.32"
 hdbconnect_async = "0.32"
 hdbconnect-arrow = { path = "crates/hdbconnect-arrow", version = "0.1.1" }
 lru = "0.16"
+num-bigint = "0.4"
+num-traits = "0.2"
 parking_lot = "0.12.5"
 pyo3 = "0.27"
 pyo3-arrow = "0.15"
