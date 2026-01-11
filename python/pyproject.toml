@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "pyhdb_rs"
 version = "0.1.0"
 description = "High-performance Python driver for SAP HANA with native Arrow support"
-readme = "../README.md"
+readme = "README.md"
 license = { text = "Apache-2.0 OR MIT" }
 authors = [{ name = "Andrei G", email = "andrei.g@my.com" }]
 requires-python = ">=3.11"
@@ -52,6 +52,7 @@ Changelog = "https://github.com/bug-ops/pyhdb-rs/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+strip = true
 python-source = "."
 module-name = "pyhdb_rs._core"
 manifest-path = "../crates/hdbconnect-py/Cargo.toml"
