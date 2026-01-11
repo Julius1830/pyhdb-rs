@@ -322,4 +322,104 @@ mod tests {
         assert_eq!(cursor.state_name(), "Idle");
         assert_eq!(cursor.rowcount(), -1);
     }
+
+    #[test]
+    fn test_cursor_default() {
+        let cursor = TypedCursor::<Idle>::default();
+        assert_eq!(cursor.state_name(), "Idle");
+        assert_eq!(cursor.rowcount(), -1);
+        assert!(!cursor.can_fetch());
+        assert!(!cursor.has_result());
+        assert!(cursor.description().is_none());
+    }
+
+    #[test]
+    fn test_cursor_execute_dml() {
+        let cursor = TypedCursor::<Idle>::new();
+        let cursor = cursor.execute_dml(42);
+        assert_eq!(cursor.rowcount(), 42);
+        assert!(cursor.description().is_none());
+        assert_eq!(cursor.state_name(), "Idle");
+    }
+
+    #[test]
+    fn test_cursor_execute_dml_zero_rows() {
+        let cursor = TypedCursor::<Idle>::new();
+        let cursor = cursor.execute_dml(0);
+        assert_eq!(cursor.rowcount(), 0);
+    }
+
+    #[test]
+    fn test_state_names() {
+        assert_eq!(Idle::STATE_NAME, "Idle");
+        assert_eq!(Executed::STATE_NAME, "Executed");
+        assert_eq!(Fetching::STATE_NAME, "Fetching");
+        assert_eq!(Exhausted::STATE_NAME, "Exhausted");
+    }
+
+    #[test]
+    fn test_column_description_creation() {
+        let desc = ColumnDescription {
+            name: "test_col".to_string(),
+            type_code: 1,
+            display_size: Some(10),
+            internal_size: Some(8),
+            precision: Some(10),
+            scale: Some(2),
+            nullable: true,
+        };
+
+        assert_eq!(desc.name, "test_col");
+        assert_eq!(desc.type_code, 1);
+        assert_eq!(desc.display_size, Some(10));
+        assert_eq!(desc.internal_size, Some(8));
+        assert_eq!(desc.precision, Some(10));
+        assert_eq!(desc.scale, Some(2));
+        assert!(desc.nullable);
+    }
+
+    #[test]
+    fn test_column_description_clone() {
+        let desc = ColumnDescription {
+            name: "col".to_string(),
+            type_code: 5,
+            display_size: None,
+            internal_size: None,
+            precision: None,
+            scale: None,
+            nullable: false,
+        };
+
+        let cloned = desc.clone();
+        assert_eq!(cloned.name, desc.name);
+        assert_eq!(cloned.type_code, desc.type_code);
+        assert_eq!(cloned.nullable, desc.nullable);
+    }
+
+    #[test]
+    fn test_state_debug_implementations() {
+        assert_eq!(format!("{:?}", Idle), "Idle");
+        assert_eq!(format!("{:?}", Executed), "Executed");
+        assert_eq!(format!("{:?}", Fetching), "Fetching");
+        assert_eq!(format!("{:?}", Exhausted), "Exhausted");
+    }
+
+    #[test]
+    fn test_state_default_implementations() {
+        let _idle: Idle = Default::default();
+        let _executed: Executed = Default::default();
+        let _fetching: Fetching = Default::default();
+        let _exhausted: Exhausted = Default::default();
+    }
+
+    #[test]
+    fn test_state_clone_copy() {
+        let idle = Idle;
+        let idle_copy = idle;
+        let _idle_clone = idle_copy.clone();
+
+        let executed = Executed;
+        let executed_copy = executed;
+        let _executed_clone = executed_copy.clone();
+    }
 }
