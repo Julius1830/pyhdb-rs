@@ -89,6 +89,8 @@ jobs:
     environment: release
     permissions:
       id-token: write
+      contents: read
+      attestations: write
     steps:
       - name: Download wheels
         uses: actions/download-artifact@v6
@@ -101,22 +103,33 @@ jobs:
         with:
           name: sdist
           path: dist
+      - name: Generate attestations
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: dist/
+          attestations: true
 
   publish-crates:
     name: Publish to crates.io
     needs: [build-wheels]
     runs-on: ubuntu-latest
     environment: release
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+      - name: Authenticate with crates.io
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
       - name: Publish hdbconnect-arrow
-        run: cargo publish -p hdbconnect-arrow --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true
+        run: cargo publish -p hdbconnect-arrow --no-verify
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   create-release:
     name: Create GitHub Release
