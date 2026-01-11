@@ -87,27 +87,24 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Setup virtual environment
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install maturin pytest pytest-cov polars pandas pyarrow
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev
+        working-directory: python
       - name: Build wheel
-        run: |
-          source .venv/bin/activate
-          maturin develop --manifest-path ../crates/hdbconnect-py/Cargo.toml
+        run: uv run maturin develop
         working-directory: python
       - name: Run tests with coverage
-        run: |
-          source .venv/bin/activate
-          pytest tests/python/ -v --tb=short --cov=pyhdb_rs --cov-report=xml
+        run: uv run pytest --cov=pyhdb_rs --cov-report=xml
+        working-directory: python
       - name: Upload Python coverage
         if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
+          files: python/coverage.xml
           fail_ci_if_error: false
 
   build-wheels:
