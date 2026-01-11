@@ -366,7 +366,9 @@ impl HanaCompatibleBuilder for FixedSizeBinaryBuilderWrapper {
 
 #[cfg(test)]
 mod tests {
-    use arrow_array::{Array, BinaryArray, FixedSizeBinaryArray, LargeBinaryArray, LargeStringArray, StringArray};
+    use arrow_array::{
+        Array, BinaryArray, FixedSizeBinaryArray, LargeBinaryArray, LargeStringArray, StringArray,
+    };
     use hdbconnect::HdbValue;
 
     use super::*;
@@ -391,7 +393,9 @@ mod tests {
     #[test]
     fn test_string_builder_append_string() {
         let mut builder = StringBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::STRING("hello".to_string())).unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING("hello".to_string()))
+            .unwrap();
         assert_eq!(builder.len(), 1);
     }
 
@@ -420,11 +424,15 @@ mod tests {
     #[test]
     fn test_string_builder_finish_and_reuse() {
         let mut builder = StringBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::STRING("first".to_string())).unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING("first".to_string()))
+            .unwrap();
         let _array1 = builder.finish();
         assert_eq!(builder.len(), 0);
 
-        builder.append_hana_value(&HdbValue::STRING("second".to_string())).unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING("second".to_string()))
+            .unwrap();
         let array2 = builder.finish();
         assert_eq!(array2.len(), 1);
     }
@@ -432,7 +440,9 @@ mod tests {
     #[test]
     fn test_string_builder_empty_string() {
         let mut builder = StringBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::STRING(String::new())).unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING(String::new()))
+            .unwrap();
 
         let array = builder.finish();
         let string_array = array.as_any().downcast_ref::<StringArray>().unwrap();
@@ -442,8 +452,12 @@ mod tests {
     #[test]
     fn test_string_builder_unicode() {
         let mut builder = StringBuilderWrapper::new(10, 1000);
-        builder.append_hana_value(&HdbValue::STRING("日本語テスト".to_string())).unwrap();
-        builder.append_hana_value(&HdbValue::STRING("émojis: 🚀🎉".to_string())).unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING("日本語テスト".to_string()))
+            .unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING("émojis: 🚀🎉".to_string()))
+            .unwrap();
 
         let array = builder.finish();
         let string_array = array.as_any().downcast_ref::<StringArray>().unwrap();
@@ -470,7 +484,9 @@ mod tests {
     #[test]
     fn test_large_string_builder_append_string() {
         let mut builder = LargeStringBuilderWrapper::new(10, 1000);
-        builder.append_hana_value(&HdbValue::STRING("large text".to_string())).unwrap();
+        builder
+            .append_hana_value(&HdbValue::STRING("large text".to_string()))
+            .unwrap();
 
         let array = builder.finish();
         let large_string_array = array.as_any().downcast_ref::<LargeStringArray>().unwrap();
@@ -490,7 +506,9 @@ mod tests {
     #[test]
     fn test_large_string_builder_append_non_string_type() {
         let mut builder = LargeStringBuilderWrapper::new(10, 1000);
-        builder.append_hana_value(&HdbValue::BIGINT(123456789)).unwrap();
+        builder
+            .append_hana_value(&HdbValue::BIGINT(123456789))
+            .unwrap();
 
         let array = builder.finish();
         let large_string_array = array.as_any().downcast_ref::<LargeStringArray>().unwrap();
@@ -516,7 +534,9 @@ mod tests {
     #[test]
     fn test_binary_builder_append_binary() {
         let mut builder = BinaryBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::BINARY(vec![1, 2, 3])).unwrap();
+        builder
+            .append_hana_value(&HdbValue::BINARY(vec![1, 2, 3]))
+            .unwrap();
 
         let array = builder.finish();
         let binary_array = array.as_any().downcast_ref::<BinaryArray>().unwrap();
@@ -536,7 +556,9 @@ mod tests {
     #[test]
     fn test_binary_builder_append_geometry() {
         let mut builder = BinaryBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::GEOMETRY(vec![0x00, 0x01, 0x02])).unwrap();
+        builder
+            .append_hana_value(&HdbValue::GEOMETRY(vec![0x00, 0x01, 0x02]))
+            .unwrap();
 
         let array = builder.finish();
         assert_eq!(array.len(), 1);
@@ -545,7 +567,9 @@ mod tests {
     #[test]
     fn test_binary_builder_append_point() {
         let mut builder = BinaryBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::POINT(vec![0xAB, 0xCD])).unwrap();
+        builder
+            .append_hana_value(&HdbValue::POINT(vec![0xAB, 0xCD]))
+            .unwrap();
 
         let array = builder.finish();
         assert_eq!(array.len(), 1);
@@ -562,7 +586,9 @@ mod tests {
     #[test]
     fn test_binary_builder_empty_binary() {
         let mut builder = BinaryBuilderWrapper::new(10, 100);
-        builder.append_hana_value(&HdbValue::BINARY(vec![])).unwrap();
+        builder
+            .append_hana_value(&HdbValue::BINARY(vec![]))
+            .unwrap();
 
         let array = builder.finish();
         let binary_array = array.as_any().downcast_ref::<BinaryArray>().unwrap();
@@ -588,7 +614,9 @@ mod tests {
     #[test]
     fn test_large_binary_builder_append_binary() {
         let mut builder = LargeBinaryBuilderWrapper::new(10, 1000);
-        builder.append_hana_value(&HdbValue::BINARY(vec![1, 2, 3, 4, 5])).unwrap();
+        builder
+            .append_hana_value(&HdbValue::BINARY(vec![1, 2, 3, 4, 5]))
+            .unwrap();
 
         let array = builder.finish();
         let large_binary_array = array.as_any().downcast_ref::<LargeBinaryArray>().unwrap();
@@ -627,10 +655,15 @@ mod tests {
     #[test]
     fn test_fixed_size_binary_builder_correct_size() {
         let mut builder = FixedSizeBinaryBuilderWrapper::new(10, 4);
-        builder.append_hana_value(&HdbValue::BINARY(vec![1, 2, 3, 4])).unwrap();
+        builder
+            .append_hana_value(&HdbValue::BINARY(vec![1, 2, 3, 4]))
+            .unwrap();
 
         let array = builder.finish();
-        let fixed_binary = array.as_any().downcast_ref::<FixedSizeBinaryArray>().unwrap();
+        let fixed_binary = array
+            .as_any()
+            .downcast_ref::<FixedSizeBinaryArray>()
+            .unwrap();
         assert_eq!(fixed_binary.value(0), &[1, 2, 3, 4]);
     }
 
@@ -657,7 +690,10 @@ mod tests {
         builder.append_null();
 
         let array = builder.finish();
-        let fixed_binary = array.as_any().downcast_ref::<FixedSizeBinaryArray>().unwrap();
+        let fixed_binary = array
+            .as_any()
+            .downcast_ref::<FixedSizeBinaryArray>()
+            .unwrap();
         assert!(fixed_binary.is_null(0));
     }
 
@@ -673,12 +709,16 @@ mod tests {
     fn test_fixed_size_binary_builder_different_widths() {
         // Test with byte_width = 8
         let mut builder8 = FixedSizeBinaryBuilderWrapper::new(10, 8);
-        builder8.append_hana_value(&HdbValue::BINARY(vec![1, 2, 3, 4, 5, 6, 7, 8])).unwrap();
+        builder8
+            .append_hana_value(&HdbValue::BINARY(vec![1, 2, 3, 4, 5, 6, 7, 8]))
+            .unwrap();
         assert_eq!(builder8.len(), 1);
 
         // Test with byte_width = 16
         let mut builder16 = FixedSizeBinaryBuilderWrapper::new(10, 16);
-        builder16.append_hana_value(&HdbValue::BINARY(vec![0; 16])).unwrap();
+        builder16
+            .append_hana_value(&HdbValue::BINARY(vec![0; 16]))
+            .unwrap();
         assert_eq!(builder16.len(), 1);
     }
 }
