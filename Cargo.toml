@@ -32,17 +32,20 @@ multiple_crate_versions = "allow"
 
 # Dependencies sorted ALPHABETICALLY - versions only (features in crates)
 [workspace.dependencies]
-arrow = { version = "57.1", default-features = false }
-arrow-array = "57.1"
-arrow-buffer = "57.1"
-arrow-data = "57.1"
-arrow-schema = "57.1"
+arrow = { version = "57.0", default-features = false }
+arrow-array = "57.0"
+arrow-buffer = "57.0"
+arrow-data = "57.0"
+arrow-schema = "57.0"
+bigdecimal = "0.4"
 criterion = "0.8"
 deadpool = { version = "0.12", default-features = false }
 hdbconnect = "0.32"
 hdbconnect_async = "0.32"
 hdbconnect-arrow = { path = "crates/hdbconnect-arrow", version = "0.1.1" }
 lru = "0.16"
+num-bigint = "0.4"
+num-traits = "0.2"
 parking_lot = "0.12.5"
 pyo3 = "0.27"
 pyo3-arrow = "0.15"
@@ -51,3 +54,19 @@ serde = "1.0"
 thiserror = "2.0"
 tokio = "1.49"
 url = "2.5"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+debug = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false

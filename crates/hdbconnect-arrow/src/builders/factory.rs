@@ -149,11 +149,12 @@ impl BuilderFactory {
         &self,
         schema: &arrow_schema::Schema,
     ) -> Vec<Box<dyn HanaCompatibleBuilder>> {
-        schema
-            .fields()
-            .iter()
-            .map(|field| self.create_builder(field.data_type()))
-            .collect()
+        let fields = schema.fields();
+        let mut builders = Vec::with_capacity(fields.len());
+        for field in fields {
+            builders.push(self.create_builder(field.data_type()));
+        }
+        builders
     }
 }
 

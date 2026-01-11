@@ -42,7 +42,6 @@ use crate::traits::streaming::BatchConfig;
 pub struct HanaBatchProcessor {
     schema: SchemaRef,
     config: BatchConfig,
-    factory: BuilderFactory,
     builders: Vec<Box<dyn HanaCompatibleBuilder>>,
     row_count: usize,
 }
@@ -52,7 +51,6 @@ impl std::fmt::Debug for HanaBatchProcessor {
         f.debug_struct("HanaBatchProcessor")
             .field("schema", &self.schema)
             .field("config", &self.config)
-            .field("factory", &"BuilderFactory { ... }")
             .field("builders", &format!("[{} builders]", self.builders.len()))
             .field("row_count", &self.row_count)
             .finish()
@@ -74,7 +72,6 @@ impl HanaBatchProcessor {
         Self {
             schema,
             config,
-            factory,
             builders,
             row_count: 0,
         }
@@ -174,19 +171,23 @@ impl HanaBatchProcessor {
 
     /// Finish the current batch and reset builders.
     ///
+    /// Arrow builders reset their internal state after `finish()`, keeping
+    /// allocated capacity for the next batch. This avoids heap allocations
+    /// at batch boundaries.
+    ///
     /// # Errors
     ///
     /// Returns error if `RecordBatch` creation fails.
     fn finish_current_batch(&mut self) -> Result<RecordBatch> {
-        // Finish all builders to get arrays
+        // Finish all builders to get arrays.
+        // Note: Arrow builders reset after finish() and retain capacity.
         let arrays: Vec<_> = self.builders.iter_mut().map(|b| b.finish()).collect();
 
         // Create RecordBatch
         let batch = RecordBatch::try_new(Arc::clone(&self.schema), arrays)
             .map_err(|e| crate::ArrowConversionError::value_conversion("batch", e.to_string()))?;
 
-        // Use cached factory instead of creating new one
-        self.builders = self.factory.create_builders_for_schema(&self.schema);
+        // Arrow builders are already reset after finish() - just reset row count
         self.row_count = 0;
 
         Ok(batch)
@@ -496,5 +497,48 @@ mod tests {
             .expect("should have remaining rows");
         assert_eq!(batch.num_rows(), 5);
         assert_eq!(processor.buffered_rows(), 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Builder Reuse Tests
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_builder_reuse_after_finish() {
+        use crate::traits::row::MockRowBuilder;
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, true),
+        ]));
+        let config = BatchConfig::with_batch_size(2);
+        let mut processor = HanaBatchProcessor::new(schema, config);
+
+        // Process first batch
+        for i in 0..2 {
+            let row = MockRowBuilder::new().int(i).string("test").build();
+            let result = processor.process_row_generic(&row).unwrap();
+            if i == 1 {
+                assert!(result.is_some(), "First batch should be ready");
+            }
+        }
+
+        // Verify processor can continue processing (builders reused)
+        for i in 2..4 {
+            let row = MockRowBuilder::new().int(i).string("test2").build();
+            let result = processor.process_row_generic(&row).unwrap();
+            if i == 3 {
+                let batch = result.expect("Second batch should be ready");
+                assert_eq!(batch.num_rows(), 2);
+                // Verify data is from second batch, not first
+                let id_array = batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<arrow_array::Int32Array>()
+                    .unwrap();
+                assert_eq!(id_array.value(0), 2);
+                assert_eq!(id_array.value(1), 3);
+            }
+        }
     }
 }

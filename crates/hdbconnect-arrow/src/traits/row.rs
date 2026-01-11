@@ -220,6 +220,33 @@ impl MockRowBuilder {
         self
     }
 
+    /// Add a decimal value from string representation.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use hdbconnect_arrow::traits::row::MockRowBuilder;
+    ///
+    /// let row = MockRowBuilder::new()
+    ///     .decimal_str("123.45")
+    ///     .decimal_str("999.99")
+    ///     .build();
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the string cannot be parsed as a decimal.
+    #[must_use]
+    #[cfg(feature = "test-utils")]
+    pub fn decimal_str(mut self, value: &str) -> Self {
+        use std::str::FromStr;
+
+        use bigdecimal::BigDecimal;
+        let bd = BigDecimal::from_str(value).expect("decimal_str requires valid decimal string");
+        self.values.push(HdbValue::DECIMAL(bd));
+        self
+    }
+
     /// Build the `MockRow`.
     #[must_use]
     pub fn build(self) -> MockRow {
@@ -302,5 +329,95 @@ mod tests {
 
         let mock = MockRow::new(vec![HdbValue::INT(1)]);
         assert_eq!(process(&mock), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "test-utils")]
+    fn test_mock_row_builder_decimal_str_valid() {
+        use std::str::FromStr;
+
+        use bigdecimal::BigDecimal;
+
+        let row = MockRowBuilder::new()
+            .decimal_str("123.45")
+            .decimal_str("999.99")
+            .build();
+
+        assert_eq!(row.len(), 2);
+
+        if let HdbValue::DECIMAL(bd) = row.get(0) {
+            assert_eq!(bd, &BigDecimal::from_str("123.45").unwrap());
+        } else {
+            panic!("Expected DECIMAL value at index 0");
+        }
+
+        if let HdbValue::DECIMAL(bd) = row.get(1) {
+            assert_eq!(bd, &BigDecimal::from_str("999.99").unwrap());
+        } else {
+            panic!("Expected DECIMAL value at index 1");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "test-utils")]
+    fn test_mock_row_builder_decimal_str_integer() {
+        use std::str::FromStr;
+
+        use bigdecimal::BigDecimal;
+
+        let row = MockRowBuilder::new().decimal_str("100").build();
+
+        assert_eq!(row.len(), 1);
+
+        if let HdbValue::DECIMAL(bd) = row.get(0) {
+            assert_eq!(bd, &BigDecimal::from_str("100").unwrap());
+        } else {
+            panic!("Expected DECIMAL value");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "test-utils")]
+    fn test_mock_row_builder_decimal_str_negative() {
+        use std::str::FromStr;
+
+        use bigdecimal::BigDecimal;
+
+        let row = MockRowBuilder::new().decimal_str("-456.78").build();
+
+        assert_eq!(row.len(), 1);
+
+        if let HdbValue::DECIMAL(bd) = row.get(0) {
+            assert_eq!(bd, &BigDecimal::from_str("-456.78").unwrap());
+        } else {
+            panic!("Expected DECIMAL value");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "test-utils")]
+    fn test_mock_row_builder_decimal_str_zero() {
+        use std::str::FromStr;
+
+        use bigdecimal::BigDecimal;
+
+        let row = MockRowBuilder::new()
+            .decimal_str("0")
+            .decimal_str("0.00")
+            .build();
+
+        assert_eq!(row.len(), 2);
+
+        if let HdbValue::DECIMAL(bd) = row.get(0) {
+            assert_eq!(bd, &BigDecimal::from_str("0").unwrap());
+        } else {
+            panic!("Expected DECIMAL value at index 0");
+        }
+
+        if let HdbValue::DECIMAL(bd) = row.get(1) {
+            assert_eq!(bd, &BigDecimal::from_str("0.00").unwrap());
+        } else {
+            panic!("Expected DECIMAL value at index 1");
+        }
     }
 }
