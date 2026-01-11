@@ -36,7 +36,7 @@ arrow = { version = "57.0", default-features = false }
 arrow-array = "57.0"
 arrow-buffer = "57.0"
 arrow-data = "57.0"
-arrow-schema = "57.1"
+arrow-schema = "57.0"
 bigdecimal = "0.4"
 criterion = "0.8"
 deadpool = { version = "0.12", default-features = false }
@@ -54,3 +54,19 @@ serde = "1.0"
 thiserror = "2.0"
 tokio = "1.49"
 url = "2.5"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+strip = "symbols"
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+debug = true
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
