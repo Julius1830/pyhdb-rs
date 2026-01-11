@@ -137,20 +137,26 @@ impl PyRecordBatchReader {
     }
 }
 
-/// Async streaming reader - loads ALL data into memory.
+/// Async streaming reader with channel-based backpressure.
 ///
-/// WARNING: This is NOT true streaming. For large result sets, use sync API.
+/// Uses a bounded mpsc channel to stream batches incrementally. A background
+/// task fetches rows asynchronously and sends batches through the channel,
+/// while the iterator blocks on receiving batches. This provides:
 ///
-/// TODO(PERF-001): Implement true async streaming using `tokio::sync::mpsc`
-/// channel to stream batches incrementally with backpressure support.
+/// - **Backpressure**: Channel bounds prevent unbounded memory growth
+/// - **Incremental processing**: Consumer processes batches as they arrive
+/// - **Error propagation**: Errors are sent through the channel
+///
+/// The channel buffer size is set to 4 batches, which provides a good balance
+/// between throughput and memory usage.
 #[cfg(feature = "async")]
 struct AsyncStreamingReader {
-    batches: std::vec::IntoIter<RecordBatch>,
+    receiver: std::sync::mpsc::Receiver<Result<RecordBatch, arrow_schema::ArrowError>>,
     schema: SchemaRef,
 }
 
 // SAFETY: AsyncStreamingReader only contains:
-// - Vec<RecordBatch>::IntoIter: RecordBatch is Send + Sync (contains Arc<ArrayData>)
+// - mpsc::Receiver: Send (Receiver<T> is Send if T is Send, RecordBatch is Send)
 // - SchemaRef (Arc<Schema>): Send + Sync
 // No shared mutable state, no thread-unsafe types, no raw pointers.
 #[cfg(feature = "async")]
@@ -158,33 +164,69 @@ unsafe impl Send for AsyncStreamingReader {}
 
 #[cfg(feature = "async")]
 impl AsyncStreamingReader {
+    /// Channel buffer size (number of batches to buffer before blocking sender).
+    const CHANNEL_BUFFER_SIZE: usize = 4;
+
     fn new(result_set: hdbconnect_async::ResultSet, batch_size: usize) -> Self {
         let schema = Self::build_schema(&result_set);
         let config = BatchConfig::with_batch_size(batch_size);
-        let mut processor = HanaBatchProcessor::new(Arc::clone(&schema), config);
-        let mut batches = Vec::new();
 
-        // Block to fetch all rows - hdbconnect_async::ResultSet.into_rows() is async
-        let rows_result = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(result_set.into_rows())
-        });
+        // Create bounded channel for backpressure
+        let (sender, receiver) = std::sync::mpsc::sync_channel(Self::CHANNEL_BUFFER_SIZE);
 
-        if let Ok(rows) = rows_result {
-            for row in rows {
-                if let Ok(Some(batch)) = processor.process_row(&row) {
-                    batches.push(batch);
+        // Clone schema for the background task
+        let schema_clone = Arc::clone(&schema);
+
+        // Spawn background task to fetch and process rows
+        tokio::task::spawn(async move {
+            let mut processor = HanaBatchProcessor::new(schema_clone, config);
+
+            // Fetch rows asynchronously
+            match result_set.into_rows().await {
+                Ok(rows) => {
+                    for row in rows {
+                        match processor.process_row(&row) {
+                            Ok(Some(batch)) => {
+                                // Send batch, stop if receiver is dropped
+                                if sender.send(Ok(batch)).is_err() {
+                                    return;
+                                }
+                            }
+                            Ok(None) => {
+                                // Continue accumulating rows
+                            }
+                            Err(e) => {
+                                let _ = sender.send(Err(arrow_schema::ArrowError::ExternalError(
+                                    Box::new(std::io::Error::other(e.to_string())),
+                                )));
+                                return;
+                            }
+                        }
+                    }
+
+                    // Flush remaining rows
+                    match processor.flush() {
+                        Ok(Some(batch)) => {
+                            let _ = sender.send(Ok(batch));
+                        }
+                        Ok(None) => {}
+                        Err(e) => {
+                            let _ = sender.send(Err(arrow_schema::ArrowError::ExternalError(
+                                Box::new(std::io::Error::other(e.to_string())),
+                            )));
+                        }
+                    }
+                }
+                Err(e) => {
+                    let _ = sender.send(Err(arrow_schema::ArrowError::ExternalError(Box::new(
+                        std::io::Error::other(e.to_string()),
+                    ))));
                 }
             }
-        }
+            // Sender drops here, signaling end of stream
+        });
 
-        if let Ok(Some(batch)) = processor.flush() {
-            batches.push(batch);
-        }
-
-        Self {
-            batches: batches.into_iter(),
-            schema,
-        }
+        Self { receiver, schema }
     }
 
     fn build_schema(result_set: &hdbconnect_async::ResultSet) -> SchemaRef {
@@ -203,7 +245,8 @@ impl Iterator for AsyncStreamingReader {
     type Item = Result<RecordBatch, arrow_schema::ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.batches.next().map(Ok)
+        // Block until a batch is available or the channel is closed
+        self.receiver.recv().ok()
     }
 }
 

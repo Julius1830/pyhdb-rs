@@ -1,6 +1,12 @@
 //! Connection pool using `deadpool`.
 //!
-//! TODO: Add min_idle configuration support
+//! Provides an async connection pool for SAP HANA with configurable size limits.
+//!
+//! # Note on `min_idle`
+//!
+//! The `deadpool` crate's managed pool does not natively support `min_idle`.
+//! The `min_idle` configuration is exposed for API consistency and future
+//! implementation. Currently, connections are created on-demand.
 #![allow(
     clippy::doc_markdown,
     clippy::missing_fields_in_debug,
@@ -16,11 +22,17 @@ use tokio::sync::Mutex as TokioMutex;
 use crate::connection::ConnectionBuilder;
 use crate::error::PyHdbError;
 
+/// Pool configuration parameters.
 #[derive(Debug, Clone)]
 pub struct PoolConfig {
+    /// Maximum number of connections in the pool.
     pub max_size: usize,
+    /// Minimum number of idle connections to maintain.
+    /// Note: Currently not enforced by deadpool; connections are created on-demand.
     pub min_idle: Option<usize>,
+    /// Connection acquisition timeout in seconds.
     pub connection_timeout_secs: u64,
+    /// Size of the prepared statement cache per connection.
     pub statement_cache_size: usize,
 }
 
@@ -35,7 +47,12 @@ impl Default for PoolConfig {
     }
 }
 
-// TODO(REFACTOR-001): Consider using Connection directly instead of this wrapper
+/// Wrapper around async HANA connection for pool management.
+///
+/// This wrapper exists to provide a clean separation between pool management
+/// and connection logic, allowing future extensions like connection-level
+/// statement caching or connection metadata without modifying the underlying
+/// hdbconnect_async::Connection.
 pub struct PooledConnectionInner {
     pub connection: hdbconnect_async::Connection,
 }
@@ -114,9 +131,32 @@ impl std::fmt::Debug for PyConnectionPool {
 
 #[pymethods]
 impl PyConnectionPool {
+    /// Creates a new connection pool.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - HANA connection URL (hdbsql://user:pass@host:port)
+    /// * `max_size` - Maximum number of connections (default: 10)
+    /// * `min_idle` - Minimum idle connections to maintain (not yet implemented)
+    /// * `connection_timeout` - Connection acquisition timeout in seconds (default: 30)
     #[new]
-    #[pyo3(signature = (url, *, max_size=10, connection_timeout=30))]
-    fn new(url: String, max_size: usize, connection_timeout: u64) -> PyResult<Self> {
+    #[pyo3(signature = (url, *, max_size=10, min_idle=None, connection_timeout=30))]
+    fn new(
+        url: String,
+        max_size: usize,
+        min_idle: Option<usize>,
+        connection_timeout: u64,
+    ) -> PyResult<Self> {
+        // Validate min_idle doesn't exceed max_size
+        if let Some(min) = min_idle {
+            if min > max_size {
+                return Err(PyHdbError::programming(format!(
+                    "min_idle ({min}) cannot exceed max_size ({max_size})"
+                ))
+                .into());
+            }
+        }
+
         let manager = HanaConnectionManager::new(&url);
 
         let pool = Pool::builder(manager)
@@ -254,7 +294,7 @@ impl PooledConnection {
             drop(guard);
             let reader = crate::reader::PyRecordBatchReader::from_resultset_async(rs, 65536)?;
 
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let polars = py.import("polars")?;
                 let df = polars.call_method1("from_arrow", (reader,))?;
                 Ok(df.unbind())

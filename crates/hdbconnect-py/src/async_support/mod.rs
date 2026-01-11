@@ -29,8 +29,6 @@
     clippy::unused_self,
     clippy::cast_precision_loss
 )]
-// TODO(DEPRECATION): Track pyo3 with_gil deprecation - update when pyo3 0.24+ provides alternative
-#![allow(deprecated)]
 
 pub mod connection;
 pub mod cursor;
@@ -40,7 +38,7 @@ pub mod statement_cache;
 pub use connection::{AsyncConnectionInner, AsyncPyConnection, SharedAsyncConnection};
 pub use cursor::AsyncPyCursor;
 pub use pool::{HanaConnectionManager, PoolConfig, PooledConnection, PyConnectionPool};
-pub use statement_cache::PreparedStatementCache;
+pub use statement_cache::{CacheStats, PreparedStatementCache};
 
 #[cfg(test)]
 mod tests;

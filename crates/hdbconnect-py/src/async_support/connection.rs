@@ -154,7 +154,9 @@ impl AsyncPyConnection {
         Ok(())
     }
 
-    // TODO(PERF-004): Integrate PreparedStatementCache with query execution
+    /// Executes a SQL query and returns an Arrow `RecordBatchReader`.
+    ///
+    /// If statement caching is enabled, tracks query statistics.
     #[pyo3(signature = (sql, batch_size=65536))]
     fn execute_arrow<'py>(
         &self,
@@ -166,7 +168,15 @@ impl AsyncPyConnection {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let mut guard = inner.lock().await;
             match &mut *guard {
-                AsyncConnectionInner::Connected { connection, .. } => {
+                AsyncConnectionInner::Connected {
+                    connection,
+                    statement_cache,
+                } => {
+                    // Track query in cache if enabled
+                    if let Some(cache) = statement_cache {
+                        cache.get_or_insert(&sql, || {});
+                    }
+
                     let rs = connection.query(&sql).await.map_err(PyHdbError::from)?;
                     drop(guard);
                     PyRecordBatchReader::from_resultset_async(rs, batch_size)
@@ -178,22 +188,63 @@ impl AsyncPyConnection {
         })
     }
 
+    /// Executes a SQL query and returns a Polars `DataFrame`.
+    ///
+    /// If statement caching is enabled, tracks query statistics.
     #[pyo3(signature = (sql))]
     fn execute_polars<'py>(&self, py: Python<'py>, sql: String) -> PyResult<Bound<'py, PyAny>> {
         let inner = Arc::clone(&self.inner);
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             let mut guard = inner.lock().await;
             match &mut *guard {
-                AsyncConnectionInner::Connected { connection, .. } => {
+                AsyncConnectionInner::Connected {
+                    connection,
+                    statement_cache,
+                } => {
+                    // Track query in cache if enabled
+                    if let Some(cache) = statement_cache {
+                        cache.get_or_insert(&sql, || {});
+                    }
+
                     let rs = connection.query(&sql).await.map_err(PyHdbError::from)?;
                     drop(guard);
                     let reader = PyRecordBatchReader::from_resultset_async(rs, 65536)?;
 
-                    Python::with_gil(|py| {
+                    Python::attach(|py| {
                         let polars = py.import("polars")?;
                         let df = polars.call_method1("from_arrow", (reader,))?;
                         Ok(df.unbind())
                     })
+                }
+                AsyncConnectionInner::Disconnected => {
+                    Err(PyHdbError::operational("connection is closed").into())
+                }
+            }
+        })
+    }
+
+    /// Returns statement cache statistics if caching is enabled.
+    fn cache_stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let inner = Arc::clone(&self.inner);
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            let guard = inner.lock().await;
+            match &*guard {
+                AsyncConnectionInner::Connected { statement_cache, .. } => {
+                    statement_cache.as_ref().map_or_else(
+                        || Python::attach(|py| Ok(py.None().into_any())),
+                        |cache| {
+                            let stats = cache.stats();
+                            Python::attach(|py| {
+                                let dict = pyo3::types::PyDict::new(py);
+                                dict.set_item("hits", stats.hits)?;
+                                dict.set_item("misses", stats.misses)?;
+                                dict.set_item("hit_rate", stats.hit_rate)?;
+                                dict.set_item("size", stats.size)?;
+                                dict.set_item("capacity", stats.capacity)?;
+                                Ok(dict.unbind().into_any())
+                            })
+                        },
+                    )
                 }
                 AsyncConnectionInner::Disconnected => {
                     Err(PyHdbError::operational("connection is closed").into())

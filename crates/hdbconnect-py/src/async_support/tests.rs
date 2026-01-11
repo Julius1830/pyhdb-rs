@@ -1,31 +1,14 @@
 //! Tests for async support module.
 //!
-//! TODO(TEST): Add unit tests for AsyncPyConnection without live HANA:
-//!   - test_connection_state_transitions (Connected -> Disconnected)
-//!   - test_connection_autocommit_property
-//!   - test_connection_repr_format
-//!
-//! TODO(TEST): Add unit tests for AsyncPyCursor:
-//!   - test_cursor_creation_from_connection
-//!   - test_cursor_close_clears_state
-//!   - test_cursor_repr_format
-//!   - test_cursor_arraysize_property
-//!
-//! TODO(TEST): Add unit tests for PoolConfig:
-//!   - test_pool_config_default_values
-//!   - test_pool_config_custom_values
-//!
-//! TODO(TEST): Add unit tests for PoolStatus:
-//!   - test_pool_status_repr_format
-//!
-//! TODO(TEST): Add integration tests (require HANA):
-//!   - test_async_connection_commit_rollback
-//!   - test_async_connection_context_manager
-//!   - test_async_cursor_execute_dml
-//!   - test_pool_health_check_recycle
-//!   - test_pool_exhaustion_timeout
+//! Unit tests that don't require a live HANA connection.
+//! Integration tests that require HANA should be in `tests/` directory.
 
+use super::pool::PoolConfig;
 use super::statement_cache::PreparedStatementCache;
+
+// =============================================================================
+// Statement Cache Tests
+// =============================================================================
 
 #[test]
 fn test_statement_cache_basic() {
@@ -106,4 +89,95 @@ fn test_statement_cache_record_use() {
     let cached = cache.get("SQL").unwrap();
     // Initial use_count is 1, plus 2 record_use calls
     assert_eq!(cached.use_count, 3);
+}
+
+// =============================================================================
+// PoolConfig Tests
+// =============================================================================
+
+#[test]
+fn test_pool_config_default_values() {
+    let config = PoolConfig::default();
+
+    assert_eq!(config.max_size, 10);
+    assert!(config.min_idle.is_none());
+    assert_eq!(config.connection_timeout_secs, 30);
+    assert_eq!(config.statement_cache_size, 0);
+}
+
+#[test]
+fn test_pool_config_custom_values() {
+    let config = PoolConfig {
+        max_size: 20,
+        min_idle: Some(5),
+        connection_timeout_secs: 60,
+        statement_cache_size: 100,
+    };
+
+    assert_eq!(config.max_size, 20);
+    assert_eq!(config.min_idle, Some(5));
+    assert_eq!(config.connection_timeout_secs, 60);
+    assert_eq!(config.statement_cache_size, 100);
+}
+
+#[test]
+fn test_pool_config_clone() {
+    let config = PoolConfig {
+        max_size: 15,
+        min_idle: Some(3),
+        connection_timeout_secs: 45,
+        statement_cache_size: 50,
+    };
+
+    let cloned = config.clone();
+
+    assert_eq!(config.max_size, cloned.max_size);
+    assert_eq!(config.min_idle, cloned.min_idle);
+    assert_eq!(config.connection_timeout_secs, cloned.connection_timeout_secs);
+    assert_eq!(config.statement_cache_size, cloned.statement_cache_size);
+}
+
+#[test]
+fn test_pool_config_debug() {
+    let config = PoolConfig::default();
+    let debug_str = format!("{config:?}");
+
+    assert!(debug_str.contains("max_size"));
+    assert!(debug_str.contains("min_idle"));
+    assert!(debug_str.contains("connection_timeout_secs"));
+    assert!(debug_str.contains("statement_cache_size"));
+}
+
+// =============================================================================
+// CacheStats Tests
+// =============================================================================
+
+#[test]
+fn test_cache_stats_initial() {
+    let cache = PreparedStatementCache::new(10);
+    let stats = cache.stats();
+
+    assert_eq!(stats.hits, 0);
+    assert_eq!(stats.misses, 0);
+    assert!((stats.hit_rate - 0.0).abs() < f64::EPSILON);
+    assert_eq!(stats.size, 0);
+    assert_eq!(stats.capacity, 10);
+}
+
+#[test]
+fn test_cache_stats_after_operations() {
+    let mut cache = PreparedStatementCache::new(5);
+
+    cache.insert("SQL1");
+    cache.insert("SQL2");
+    cache.get("SQL1"); // hit
+    cache.get("SQL3"); // miss
+
+    let stats = cache.stats();
+
+    assert_eq!(stats.hits, 1);
+    assert_eq!(stats.misses, 1);
+    assert!((stats.hit_rate - 0.5).abs() < 0.01);
+    assert_eq!(stats.size, 2);
+    assert_eq!(stats.capacity, 5);
 }
