@@ -6,8 +6,8 @@ resolver = "3"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/user/hdbconnect-py"
-authors = ["Your Name <your@email.com>"]
+repository = "https://github.com/bug-ops/pyhdb-rs"
+authors = ["Andrei G <andrei.g@my.com>"]
 
 [workspace.lints.rust]
 missing_debug_implementations = "warn"
@@ -41,5 +41,6 @@ hdbconnect = "0.32"
 parking_lot = "0.12.5"
 pyo3 = { version = "0.27", features = ["extension-module", "abi3-py311"] }
 pyo3-arrow = "0.15"
+serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 url = "2.5"
