@@ -356,4 +356,141 @@ mod tests {
         assert_eq!(stats.size, 2);
         assert_eq!(stats.capacity, 10);
     }
+
+    #[test]
+    fn test_statement_key_sql_accessor() {
+        let key = StatementKey::new("SELECT * FROM users");
+        assert_eq!(key.sql(), "SELECT * FROM users");
+    }
+
+    #[test]
+    fn test_statement_key_into_string() {
+        let key = StatementKey::new("SELECT 1");
+        let sql = key.into_string();
+        assert_eq!(sql, "SELECT 1");
+    }
+
+    #[test]
+    fn test_statement_key_from_string() {
+        let sql = String::from("SELECT * FROM orders");
+        let key = StatementKey::new(sql);
+        assert_eq!(key.sql(), "SELECT * FROM orders");
+    }
+
+    #[test]
+    fn test_statement_key_debug() {
+        let key = StatementKey::new("SELECT 1");
+        let debug_str = format!("{:?}", key);
+        assert!(debug_str.contains("StatementKey"));
+        assert!(debug_str.contains("SELECT 1"));
+    }
+
+    #[test]
+    fn test_cached_statement_debug() {
+        let stmt = CachedStatement {
+            sql: "SELECT 1".to_string(),
+            use_count: 5,
+        };
+        let debug_str = format!("{:?}", stmt);
+        assert!(debug_str.contains("CachedStatement"));
+    }
+
+    #[test]
+    fn test_cached_statement_clone() {
+        let stmt = CachedStatement {
+            sql: "SELECT 1".to_string(),
+            use_count: 10,
+        };
+        let cloned = stmt.clone();
+        assert_eq!(cloned.sql, "SELECT 1");
+        assert_eq!(cloned.use_count, 10);
+    }
+
+    #[test]
+    fn test_record_use_increments_count() {
+        let mut cache = PreparedStatementCache::new(10);
+        cache.insert("SELECT 1");
+        cache.record_use("SELECT 1");
+        cache.record_use("SELECT 1");
+
+        let cached = cache.get("SELECT 1").unwrap();
+        assert_eq!(cached.use_count, 3); // 1 from insert + 2 from record_use
+    }
+
+    #[test]
+    fn test_record_use_nonexistent_key() {
+        let mut cache = PreparedStatementCache::new(10);
+        // Should not panic for nonexistent key
+        cache.record_use("NONEXISTENT");
+    }
+
+    #[test]
+    fn test_hit_rate_zero_when_empty() {
+        let cache = PreparedStatementCache::new(10);
+        assert_eq!(cache.hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_cache_stats_copy() {
+        let stats = CacheStats {
+            hits: 10,
+            misses: 5,
+            hit_rate: 0.666,
+            size: 3,
+            capacity: 10,
+        };
+        let copied = stats;
+        assert_eq!(copied.hits, 10);
+        assert_eq!(copied.misses, 5);
+    }
+
+    #[test]
+    fn test_cache_stats_partial_eq() {
+        let stats1 = CacheStats {
+            hits: 10,
+            misses: 5,
+            hit_rate: 0.666,
+            size: 3,
+            capacity: 10,
+        };
+        let stats2 = CacheStats {
+            hits: 10,
+            misses: 5,
+            hit_rate: 0.666,
+            size: 3,
+            capacity: 10,
+        };
+        assert_eq!(stats1, stats2);
+    }
+
+    #[test]
+    fn test_cache_insert_returns_evicted() {
+        let mut cache = PreparedStatementCache::new(1);
+        cache.insert("SQL1");
+
+        let evicted = cache.insert("SQL2");
+        assert!(evicted.is_some());
+        assert_eq!(evicted.unwrap().sql, "SQL1");
+    }
+
+    #[test]
+    fn test_get_or_insert_increments_use_count() {
+        let mut cache = PreparedStatementCache::new(10);
+        cache.insert("SELECT 1");
+
+        // First call should hit and increment
+        cache.get_or_insert("SELECT 1", || {});
+        // Second call should hit again
+        let cached = cache.get_or_insert("SELECT 1", || {});
+
+        // use_count: 1 (insert) + 1 (first get_or_insert) + 1 (second get_or_insert)
+        assert_eq!(cached.use_count, 3);
+    }
+
+    #[test]
+    fn test_statement_key_clone() {
+        let key = StatementKey::new("SELECT 1");
+        let cloned = key.clone();
+        assert_eq!(key, cloned);
+    }
 }

@@ -377,3 +377,88 @@ impl PooledConnection {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pool_config_default() {
+        let config = PoolConfig::default();
+        assert_eq!(config.max_size, 10);
+        assert_eq!(config.min_idle, None);
+        assert_eq!(config.connection_timeout_secs, 30);
+        assert_eq!(config.statement_cache_size, 0);
+    }
+
+    #[test]
+    fn test_pool_config_clone() {
+        let config = PoolConfig {
+            max_size: 20,
+            min_idle: Some(5),
+            connection_timeout_secs: 60,
+            statement_cache_size: 100,
+        };
+
+        let cloned = config.clone();
+        assert_eq!(cloned.max_size, 20);
+        assert_eq!(cloned.min_idle, Some(5));
+        assert_eq!(cloned.connection_timeout_secs, 60);
+        assert_eq!(cloned.statement_cache_size, 100);
+    }
+
+    #[test]
+    fn test_pool_config_debug() {
+        let config = PoolConfig::default();
+        let debug_str = format!("{:?}", config);
+        assert!(debug_str.contains("PoolConfig"));
+        assert!(debug_str.contains("max_size"));
+    }
+
+    #[test]
+    fn test_hana_connection_manager_new() {
+        let manager = HanaConnectionManager::new("hdbsql://user:pass@host:30015");
+        let debug_str = format!("{:?}", manager);
+        assert!(debug_str.contains("HanaConnectionManager"));
+    }
+
+    #[test]
+    fn test_pool_status_repr() {
+        let status = PoolStatus {
+            size: 5,
+            available: 3,
+            max_size: 10,
+        };
+
+        let repr = status.__repr__();
+        assert!(repr.contains("size=5"));
+        assert!(repr.contains("available=3"));
+        assert!(repr.contains("max_size=10"));
+    }
+
+    #[test]
+    fn test_pool_status_clone() {
+        let status = PoolStatus {
+            size: 5,
+            available: 3,
+            max_size: 10,
+        };
+
+        let cloned = status.clone();
+        assert_eq!(cloned.size, 5);
+        assert_eq!(cloned.available, 3);
+        assert_eq!(cloned.max_size, 10);
+    }
+
+    #[test]
+    fn test_pool_status_debug() {
+        let status = PoolStatus {
+            size: 1,
+            available: 1,
+            max_size: 5,
+        };
+
+        let debug_str = format!("{:?}", status);
+        assert!(debug_str.contains("PoolStatus"));
+    }
+}

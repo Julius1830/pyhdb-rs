@@ -232,4 +232,64 @@ mod tests {
             .tls(true);
         // Type system ensures this is ConnectionBuilder<HasHost, HasCredentials>
     }
+
+    #[test]
+    fn test_builder_missing_username() {
+        let result = ConnectionBuilder::from_url("hdbsql://:pass@localhost:30015");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builder_missing_password() {
+        let result = ConnectionBuilder::from_url("hdbsql://user@localhost:30015");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builder_with_tls_scheme() {
+        let builder = ConnectionBuilder::from_url("hdbsqls://user:pass@localhost:30015");
+        assert!(builder.is_ok());
+        // TLS should be enabled for hdbsqls scheme
+    }
+
+    #[test]
+    fn test_builder_without_database() {
+        let builder = ConnectionBuilder::from_url("hdbsql://user:pass@localhost:30015");
+        assert!(builder.is_ok());
+    }
+
+    #[test]
+    fn test_builder_default_port() {
+        let builder = ConnectionBuilder::from_url("hdbsql://user:pass@localhost");
+        assert!(builder.is_ok());
+    }
+
+    #[test]
+    fn test_builder_default() {
+        let builder = ConnectionBuilder::<MissingHost, MissingCredentials>::default();
+        let debug_str = format!("{:?}", builder);
+        assert!(debug_str.contains("ConnectionBuilder"));
+    }
+
+    #[test]
+    fn test_builder_invalid_url() {
+        let result = ConnectionBuilder::from_url("not-a-valid-url");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_state_debug_implementations() {
+        assert_eq!(format!("{:?}", MissingHost), "MissingHost");
+        assert_eq!(format!("{:?}", HasHost), "HasHost");
+        assert_eq!(format!("{:?}", MissingCredentials), "MissingCredentials");
+        assert_eq!(format!("{:?}", HasCredentials), "HasCredentials");
+    }
+
+    #[test]
+    fn test_state_default_implementations() {
+        let _missing_host: MissingHost = Default::default();
+        let _has_host: HasHost = Default::default();
+        let _missing_creds: MissingCredentials = Default::default();
+        let _has_creds: HasCredentials = Default::default();
+    }
 }

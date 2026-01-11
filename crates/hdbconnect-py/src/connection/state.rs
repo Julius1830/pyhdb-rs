@@ -232,4 +232,40 @@ mod tests {
         assert!(InTransaction::CAN_EXECUTE);
         assert!(InTransaction::IN_TRANSACTION);
     }
+
+    #[test]
+    fn test_state_names() {
+        assert_eq!(Disconnected::STATE_NAME, "Disconnected");
+        assert_eq!(Connected::STATE_NAME, "Connected");
+        assert_eq!(InTransaction::STATE_NAME, "InTransaction");
+    }
+
+    #[test]
+    fn test_state_debug_implementations() {
+        assert_eq!(format!("{:?}", Disconnected), "Disconnected");
+        assert_eq!(format!("{:?}", Connected), "Connected");
+        assert_eq!(format!("{:?}", InTransaction), "InTransaction");
+    }
+
+    #[test]
+    fn test_state_default_implementations() {
+        let _disconnected: Disconnected = Default::default();
+        let _connected: Connected = Default::default();
+        let _in_transaction: InTransaction = Default::default();
+    }
+
+    #[test]
+    fn test_state_clone_copy() {
+        let disconnected = Disconnected;
+        let disconnected_copy = disconnected;
+        let _disconnected_clone = disconnected_copy.clone();
+
+        let connected = Connected;
+        let connected_copy = connected;
+        let _connected_clone = connected_copy.clone();
+
+        let in_tx = InTransaction;
+        let in_tx_copy = in_tx;
+        let _in_tx_clone = in_tx_copy.clone();
+    }
 }
