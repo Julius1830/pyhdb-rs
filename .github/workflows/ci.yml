@@ -138,14 +138,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Generate coverage
-        run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
-      - name: Upload Rust coverage
+      - name: Generate hdbconnect-arrow coverage
+        run: cargo llvm-cov --package hdbconnect-arrow --all-features --lcov --output-path hdbconnect-arrow.lcov
+      - name: Generate hdbconnect-py coverage
+        run: cargo llvm-cov --package hdbconnect-py --all-features --lcov --output-path hdbconnect-py.lcov
+      - name: Upload hdbconnect-arrow coverage
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: lcov.info
-          flags: rust
+          files: hdbconnect-arrow.lcov
+          flags: hdbconnect-arrow
+          fail_ci_if_error: false
+      - name: Upload hdbconnect-py coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: hdbconnect-py.lcov
+          flags: hdbconnect-py
           fail_ci_if_error: false
 
   msrv:
