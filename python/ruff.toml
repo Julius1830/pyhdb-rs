@@ -23,6 +23,7 @@ ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
     "ARG001", # unused function argument
+    "RUF022", # __all__ is not sorted (we use logical grouping)
 ]
 
 [lint.per-file-ignores]
