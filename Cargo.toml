@@ -41,7 +41,7 @@ criterion = "0.8"
 deadpool = { version = "0.12", default-features = false }
 hdbconnect = "0.32"
 hdbconnect_async = "0.32"
-hdbconnect-arrow = { path = "../hdbconnect-arrow", version = "0.1.0" }
+hdbconnect-arrow = { path = "crates/hdbconnect-arrow", version = "0.1.0" }
 lru = "0.12"
 parking_lot = "0.12.5"
 pyo3 = "0.27"
