@@ -31,6 +31,11 @@ pyo3:
       - any-glob-to-any-file:
           - "crates/hdbconnect-py/**"
 
+examples:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "examples/**"
+
 # Category labels
 documentation:
   - changed-files:
