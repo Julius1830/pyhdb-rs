@@ -77,35 +77,40 @@ jobs:
         run: cargo nextest run --workspace --all-features --exclude hdbconnect-py
 
   test-python:
-    name: Test Python ${{ matrix.python-version }}
+    name: Test Python ${{ matrix.python-version }} (${{ matrix.os }})
     needs: [lint-rust, lint-python]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-python-${{ matrix.os }}
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-dependency-glob: python/uv.lock
+          cache-suffix: ${{ matrix.os }}-${{ matrix.python-version }}
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --frozen --extra dev
         working-directory: python
       - name: Build wheel
-        run: uv run maturin develop
+        run: uv run maturin develop --release
         working-directory: python
       - name: Run tests with coverage
         run: uv run pytest --cov=pyhdb_rs --cov-report=xml
         working-directory: python
       - name: Upload Python coverage
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -113,32 +118,64 @@ jobs:
           fail_ci_if_error: false
 
   build-wheels:
-    name: Build wheels (${{ matrix.os }})
+    name: Build wheels (${{ matrix.target }})
     needs: [test-rust, test-python]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          # Linux glibc
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            manylinux: auto
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            manylinux: auto
+          # Linux musl (Alpine, static builds)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            manylinux: musllinux_1_2
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            manylinux: musllinux_1_2
+          # macOS
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            manylinux: auto
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            manylinux: auto
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            manylinux: auto
+          # NOTE: aarch64-pc-windows-msvc disabled until upstream deps
+          # (advapi32-sys, username) support Windows ARM64
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+        with:
+          targets: ${{ matrix.target }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
           working-directory: python
+          target: ${{ matrix.target }}
           args: --release --out dist
-          manylinux: auto
+          manylinux: ${{ matrix.manylinux }}
           sccache: true
+        env:
+          SCCACHE_GHA_ENABLED: "true"
       - name: Upload wheels
         uses: actions/upload-artifact@v6
         with:
-          name: wheels-${{ matrix.os }}
+          name: wheels-${{ matrix.target }}
           path: python/dist/*.whl
 
   coverage-rust:
