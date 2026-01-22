@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-01-22
+
+### Fixed
+
+- Ruff linting issues in test suite (B009: unnecessary getattr with constant attribute)
+- Code formatting compliance in test files
+
 ## [0.2.1] - 2026-01-22
 
 ### Added
@@ -16,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Include HANA error codes (e.g., [260] for table not found)
   - Show SQLSTATE for SQL standard error documentation
   - Display error position in SQL query for syntax errors
+- Arrow PyCapsule Interface (__arrow_c_stream__) for zero-copy integration
+  - Seamless integration with Polars, PyArrow, pandas, and other Arrow-compatible libraries
+  - Delegates to pyo3_arrow for FFI safety
+  - Implements consumption semantics (single-use pattern)
 
 ### Changed
 
@@ -178,7 +189,9 @@ Initial release of pyhdb-rs — high-performance Python driver for SAP HANA.
 - Build provenance attestations for all release artifacts
 - Dependency auditing with cargo-deny
 
-[Unreleased]: https://github.com/bug-ops/pyhdb-rs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bug-ops/pyhdb-rs/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/bug-ops/pyhdb-rs/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/bug-ops/pyhdb-rs/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/bug-ops/pyhdb-rs/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/bug-ops/pyhdb-rs/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/bug-ops/pyhdb-rs/compare/v0.1.1...v0.1.2
